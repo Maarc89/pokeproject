@@ -4,7 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="54f5bc2d-9b7c-4012-a0da-6f28d73b021a" name="Changes" comment="" />
+    <list default="true" id="54f5bc2d-9b7c-4012-a0da-6f28d73b021a" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/pokedex/templates/main/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/pokedex/templates/main/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pokedex/templates/registration/login.html" beforeDir="false" afterPath="$PROJECT_DIR$/pokedex/templates/registration/login.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pokedex/templates/registration/register.html" beforeDir="false" afterPath="$PROJECT_DIR$/pokedex/templates/registration/register.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pokedex/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/pokedex/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pokedex/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/pokedex/views.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pokeproject/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/pokeproject/settings.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -134,6 +141,7 @@
       <workItem from="1739970795576" duration="27000" />
       <workItem from="1739970890213" duration="114000" />
       <workItem from="1739980151519" duration="1257000" />
+      <workItem from="1739989887168" duration="7045000" />
     </task>
     <servers />
   </component>

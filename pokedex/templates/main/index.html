@@ -15,6 +15,14 @@
 <!-- Inserting the main image -->
 <img src="{% static 'img/pokemon_logo.png' %}" class="image" style="width:400px;">
 
+<!-- Botones para loguearse y registrarse -->
+{% if user.is_authenticated %}
+    <p>Hola, {{ user.username }}! <a href="{% url 'logout' %}">Cerrar sesión</a></p>
+{% else %}
+    <a href="{% url 'login' %}"><button>Iniciar sesión</button></a>
+    <a href="{% url 'register' %}"><button>Registrarse</button></a>
+{% endif %}
+
 <form method="post">
     <!-- Cross-site request forgery Protection-->
     {% csrf_token %}
@@ -35,6 +43,9 @@
         </h3>
         <h3>
             Type: {{ types }}
+        </h3>
+        <h3>
+            Abilities: {{ abilities }}
         </h3>
         <h3>
             Default sprite:

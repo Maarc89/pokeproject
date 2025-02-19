@@ -1,10 +1,27 @@
-<form method="post">
-    {% csrf_token %}
-    <input type="text" name="username" placeholder="Usuario" required>
-    <input type="password" name="password" placeholder="Contraseña" required>
-    <button type="submit">Iniciar sesión</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
+{% load static %}
+<head>
+    <meta charset="UTF-8">
+    <title>Iniciar sesión</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" crossorigin="anonymous"/>
+    <link rel="icon" href="{% static 'img/pokeball_icon.ico' %}" type="image/x-icon">
+</head>
+<body>
+    <h2>Iniciar sesión</h2>
+    <form method="post">
+        {% csrf_token %}
+        <input type="text" name="username" placeholder="Usuario" required>
+        <input type="password" name="password" placeholder="Contraseña" required>
+        <button type="submit">Entrar</button>
+    </form>
 
-{% if error %}
-    <p>{{ error }}</p>
-{% endif %}
+    {% if messages %}
+        {% for message in messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <a href="{% url 'register' %}">Registrarse</a>
+</body>
+</html>
