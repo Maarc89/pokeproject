@@ -1,0 +1,8 @@
+<h1>Mis Pokémon</h1>
+<ul>
+    {% for pokemon in pokemon_list %}
+        <li>{{ pokemon.name }} - {{ pokemon.types }}</li>
+    {% empty %}
+        <li>No tienes Pokémon guardados.</li>
+    {% endfor %}
+</ul>
