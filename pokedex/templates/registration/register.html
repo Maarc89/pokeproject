@@ -3,12 +3,12 @@
 {% load static %}
 <head>
     <meta charset="UTF-8">
-    <title>Registro</title>
+    <title>Register</title>
     <link rel="stylesheet" href="{% static 'css/styles.css' %}" crossorigin="anonymous"/>
     <link rel="icon" href="{% static 'img/pokeball_icon.ico' %}" type="image/x-icon">
 </head>
 <body>
-    <h2>Registrarse</h2>
+    <h2>Register</h2>
     <form method="post">
         {% csrf_token %}
         <input type="text" name="username" placeholder="Usuario" required>
@@ -23,6 +23,6 @@
         {% endfor %}
     {% endif %}
 
-    <a href="{% url 'login' %}">Iniciar sesión</a>
+    <a href="{% url 'login' %}">Login</a>
 </body>
 </html>

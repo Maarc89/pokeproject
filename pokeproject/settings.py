@@ -86,6 +86,7 @@ DATABASES = {
     }
 }
 
+LOGOUT_REDIRECT_URL = '/'
 
 
 # Password validation

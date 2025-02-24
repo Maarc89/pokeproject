@@ -17,10 +17,14 @@
 
 <!-- Botones para loguearse y registrarse -->
 {% if user.is_authenticated %}
-    <p>Hola, {{ user.username }}! <a href="{% url 'logout' %}">Cerrar sesión</a></p>
+    <p>Hi, {{ user.username }}! <a href="{% url 'logout' %}">Sign out</a></p>
 {% else %}
-    <a href="{% url 'login' %}"><button>Iniciar sesión</button></a>
-    <a href="{% url 'register' %}"><button>Registrarse</button></a>
+    <a href="{% url 'login' %}">
+        <button>Login</button>
+    </a>
+    <a href="{% url 'register' %}">
+        <button>Register</button>
+    </a>
 {% endif %}
 
 <form method="post">
@@ -54,10 +58,17 @@
     {% else %}
         <div>
             <h3>
-                Escribe el nombre o ID de tu pokemon.
+                Type the name or ID of your pokemon.
             </h3>
         </div>
     {% endif %}
+    <!-- Botón para redirigir a la vista de my_pokemon -->
+    {% if user.is_authenticated %}
+        <a href="{% url 'my_pokemon' %}">
+            <button>My Pokémon</button>
+        </a>
+    {% endif %}
+
 </div>
 </body>
 </html>
