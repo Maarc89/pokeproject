@@ -11,7 +11,7 @@ PokeProject is a Django web application that interacts with the PokéAPI to disp
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+
 - Django 4.0+
 - PostgreSQL
 
