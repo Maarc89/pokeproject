@@ -1,23 +1,33 @@
-# Entorno virtual
+# Virtual environment
 .venv/
+venv/
 env/
 
-# Archivos de base de datos
+# Database files
 db.sqlite3
 
-# Archivos de configuración del IDE
+# IDE configuration
 .idea/
 .vscode/
 
-# Archivos de configuración sensibles
+# Sensitive configuration
+.env
 *.env
+!.env.example
 
-# Archivos de caché y compilación
+# Cache and build artifacts
 __pycache__/
 *.pyc
+staticfiles/
+media/
 
-# Archivos de logs
+# Logs
 *.log
 
-# Migraciones
-*/migrations/*
+# OS files
+.DS_Store
+Thumbs.db
+
+# Note: migrations are intentionally NOT ignored. Django migrations are source
+# code and must be committed, or `manage.py migrate` on a fresh clone creates
+# no tables.

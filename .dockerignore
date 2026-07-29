@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE / OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage
+
+# Local data / build output
+db.sqlite3
+staticfiles
+media
+*.log
+
+# Secrets
+.env
+
+# Docs
+*.md
+!README.md
