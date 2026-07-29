@@ -1,0 +1,58 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block description %}Search the Pokedex, build your collection, and pit two Pokemon against each other.{% endblock %}">
+    <title>{% block title %}Pokedex{% endblock %} | Pokedex</title>
+    <link rel="icon" href="{% static 'img/pokeball_icon.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header">
+    <a href="{% url 'index' %}" class="brand">
+        <img src="{% static 'img/pokemon_logo.png' %}" alt="Pokedex home" width="180" height="66">
+    </a>
+
+    <nav class="site-nav" aria-label="Main">
+        <a href="{% url 'index' %}"{% if request.resolver_match.url_name == 'index' %} aria-current="page"{% endif %}>Search</a>
+        <a href="{% url 'battle' %}"{% if request.resolver_match.url_name == 'battle' %} aria-current="page"{% endif %}>Battle</a>
+        {% if user.is_authenticated %}
+            <a href="{% url 'my_pokemon' %}"{% if request.resolver_match.url_name == 'my_pokemon' %} aria-current="page"{% endif %}>My Pokemon</a>
+            <a href="{% url 'battle_history' %}"{% if request.resolver_match.url_name == 'battle_history' %} aria-current="page"{% endif %}>History</a>
+        {% endif %}
+    </nav>
+
+    <div class="site-account">
+        {% if user.is_authenticated %}
+            <span class="site-account__user">{{ user.username }}</span>
+            {# LogoutView rejects GET since Django 5, so this must be a POST form. #}
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--ghost">Sign out</button>
+            </form>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn--ghost">Log in</a>
+            <a href="{% url 'register' %}" class="btn">Register</a>
+        {% endif %}
+    </div>
+</header>
+
+<main id="main" class="site-main">
+    {% include "partials/_messages.html" %}
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <p>Data from <a href="https://pokeapi.co/" rel="noopener noreferrer" target="_blank">PokeAPI</a>. Not affiliated with Nintendo or The Pokemon Company.</p>
+</footer>
+
+{# Shared by the search and battle inputs; filled in by app.js. #}
+<datalist id="pokemon-suggestions"></datalist>
+
+<script src="{% static 'js/app.js' %}" defer></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: ruff
+        run: ruff check --output-format=github .
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pokeproject_db
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d pokeproject_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret-key-not-used-anywhere-real
+      # Tests render templates that reference static files. The manifest static
+      # storage is off under DEBUG, which avoids needing collectstatic here.
+      DJANGO_DEBUG: "1"
+      POSTGRES_DB: pokeproject_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ci-password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Migrations are complete and committed
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Migrate
+        run: python manage.py migrate --noinput
+
+      - name: Test
+        run: coverage run manage.py test --verbosity 2
+
+      - name: Coverage report
+        run: coverage report
+
+  deploy-checks:
+    name: Production checks
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: example.com
+      POSTGRES_PASSWORD: ci-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Generate a throwaway secret key
+        # A short literal would trip security.W009, which is the check doing its
+        # job -- so generate a real one rather than weaken the check.
+        run: |
+          echo "DJANGO_SECRET_KEY=$(python -c 'from django.core.management.utils import get_random_secret_key as k; print(k())')" >> "$GITHUB_ENV"
+
+      - name: collectstatic
+        run: python manage.py collectstatic --noinput
+
+      - name: check --deploy
+        # --fail-level WARNING so a security regression fails the build rather
+        # than printing a warning nobody reads.
+        run: python manage.py check --deploy --fail-level WARNING
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: pokeproject:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

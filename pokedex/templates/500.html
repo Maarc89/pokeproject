@@ -1,0 +1,30 @@
+{# Deliberately standalone: a 500 page must render even when the database,
+   context processors, or static manifest are the thing that is broken, so it
+   extends nothing and links nothing. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Something went wrong | Pokedex</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f6fb; color: #16202e;
+               display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 1rem; }
+        .box { background: #fff; border: 1px solid #d7ddea; border-radius: 16px;
+               padding: 2rem; max-width: 32rem; text-align: center; }
+        a { color: #1b4f8a; }
+        @media (prefers-color-scheme: dark) {
+            body { background: #0f151f; color: #e8edf5; }
+            .box { background: #182130; border-color: #2d3a4f; }
+            a { color: #7fb3ee; }
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Something went wrong</h1>
+        <p>An unexpected error occurred on our side. The problem has been logged.</p>
+        <p><a href="/">Back to search</a></p>
+    </div>
+</body>
+</html>

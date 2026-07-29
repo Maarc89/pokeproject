@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Battle{% endblock %}
+
+{% block content %}
+    <h1>Pokemon Battle</h1>
+    <p class="lede">
+        Two Pokemon, compared on base stats and on how well each one's strongest
+        move lands against the other's typing.
+    </p>
+
+    <form method="post" action="{% url 'battle_result' %}" class="card battle-form" data-loading>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <p class="field__error">{{ form.non_field_errors.0 }}</p>
+        {% endif %}
+
+        <div class="battle-form__inputs">
+            <div class="field">
+                <label for="{{ form.pokemon1.id_for_label }}">{{ form.pokemon1.label }}</label>
+                {{ form.pokemon1 }}
+                {% if form.pokemon1.errors %}<p class="field__error">{{ form.pokemon1.errors.0 }}</p>{% endif %}
+            </div>
+
+            <p class="battle-form__versus" aria-hidden="true">vs</p>
+
+            <div class="field">
+                <label for="{{ form.pokemon2.id_for_label }}">{{ form.pokemon2.label }}</label>
+                {{ form.pokemon2 }}
+                {% if form.pokemon2.errors %}<p class="field__error">{{ form.pokemon2.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn--primary">Start Battle</button>
+        <p class="hint">Looking up move data takes a moment the first time a Pokemon is battled.</p>
+    </form>
+{% endblock %}

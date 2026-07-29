@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}PokeAPI unavailable{% endblock %}
+
+{% block content %}
+    <div class="card empty-state">
+        <h1>PokeAPI is not responding</h1>
+        <p>
+            This app reads its data from PokeAPI, and that service is currently
+            unreachable or returning errors. Nothing is wrong with your account.
+        </p>
+        <p class="hint">Give it a minute and try again.</p>
+        <a href="{% url 'index' %}" class="btn btn--primary">Back to search</a>
+    </div>
+{% endblock %}

@@ -1,22 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<!-- The load static is necessary to load images, css and JS -->
-{% load static %}
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}" crossorigin="anonymous"/>
-    <link rel="icon" href="{% static 'img/pokeball_icon.ico' %}" type="image/x-icon">
-    <title>Pokedex | Django</title>
-</head>
-<body>
-    <!-- Inserting the main image -->
-    <img src="{% static 'img/pokemon_logo.png' %}" class="image" style="width:400px;">
+{% block title %}Not found{% endblock %}
 
-    <div>
-        <h3>Pokemon no encontrado, trata de regresar a <a href="{% url 'index' %}">home.</a></h3>
+{% block content %}
+    <div class="card empty-state">
+        <h1>No such Pokemon</h1>
+        {% if searched_for %}
+            <p>Nothing in the Pokedex matches <strong>{{ searched_for }}</strong>.</p>
+        {% else %}
+            <p>That page does not exist.</p>
+        {% endif %}
+        <p class="hint">Try a name like <code>pikachu</code>, or a number like <code>25</code>.</p>
+        <a href="{% url 'index' %}" class="btn btn--primary">Back to search</a>
     </div>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% comment %}
+One side of a battle result.
+Expects `contender` (a services.battle.Contender) and `won` (bool).
+{% endcomment %}
+<article class="card contender {% if won %}contender--winner{% endif %}">
+    {% if won %}
+        {# A text badge, not just the border colour, so the winner is clear
+           without relying on colour perception. #}
+        <p class="contender__crown">Winner</p>
+    {% endif %}
+
+    {% include "partials/_sprite.html" with sprite=contender.profile.sprite name=contender.name size=120 %}
+
+    <h2>{{ contender.name }}</h2>
+    {% include "partials/_types.html" with types=contender.profile.types %}
+
+    <dl class="facts">
+        <dt>Base stats</dt>
+        <dd>{{ contender.stat_score }}</dd>
+
+        <dt>Strongest move</dt>
+        <dd>
+            {% if contender.best_move %}
+                {{ contender.best_move.display_name }}
+                <span class="muted">({{ contender.best_move.type|title }}, power {{ contender.move_power }})</span>
+                {% if contender.stab %}
+                    <span class="badge badge--saved" title="Same Type Attack Bonus: the move matches this Pokemon's own type">STAB &times;1.5</span>
+                {% endif %}
+            {% else %}
+                <span class="muted">No damaging move</span>
+            {% endif %}
+        </dd>
+
+        <dt>Type matchup</dt>
+        <dd>
+            <span class="matchup matchup--{% if contender.multiplier > 1 %}good{% elif contender.multiplier < 1 %}bad{% else %}neutral{% endif %}">
+                {{ contender.multiplier|floatformat:"-2" }}&times; &mdash; {{ contender.effectiveness_label }}
+            </span>
+        </dd>
+
+        <dt>Move contribution</dt>
+        <dd>{{ contender.move_score }}</dd>
+    </dl>
+
+    <p class="contender__total">Total <strong>{{ contender.total }}</strong></p>
+</article>
