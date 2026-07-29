@@ -1,32 +1,60 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Pokémon</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-</head>
-<body>
-    <div class="container">
-        <h1>Mis Pokémon</h1>
+{% extends "base.html" %}
 
-        {% if pokemon_list %}
-            <ul>
-                {% for pokemon in pokemon_list %}
-                    <li>
-                        <span class="pokemon-name">{{ pokemon.name }}</span>
-                        <span class="pokemon-types">{{ pokemon.types }}</span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="no-pokemon">No tienes Pokémon guardados.</p>
-        {% endif %}
+{% block title %}My Pokemon{% endblock %}
 
-        <!-- Botón para volver al buscador -->
-        <a href="{% url 'index' %}" class="btn">Volver al Buscador</a>
-    </div>
-</body>
-</html>
+{% block content %}
+    <h1>My Pokemon</h1>
+
+    {% if page_obj.paginator.count %}
+        <form method="get" class="filters">
+            <div class="field">
+                <label for="type-filter">Filter by type</label>
+                <select name="type" id="type-filter">
+                    <option value="">All types</option>
+                    {% for type in owned_types %}
+                        <option value="{{ type }}"{% if type == active_type %} selected{% endif %}>{{ type|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="sort-order">Sort by</label>
+                <select name="sort" id="sort-order">
+                    <option value="number"{% if active_sort == 'number' %} selected{% endif %}>Number</option>
+                    <option value="name"{% if active_sort == 'name' %} selected{% endif %}>Name</option>
+                    <option value="recent"{% if active_sort == 'recent' %} selected{% endif %}>Recently saved</option>
+                </select>
+            </div>
+            <button type="submit" class="btn">Apply</button>
+        </form>
+
+        <p class="result-count">
+            {{ page_obj.paginator.count }} Pokemon saved{% if active_type %}, showing {{ active_type|title }} types{% endif %}.
+        </p>
+
+        <ul class="pokemon-grid">
+            {% for saved in page_obj %}
+                <li class="card pokemon-tile">
+                    {% include "partials/_sprite.html" with sprite=saved.species.sprite name=saved.species.name size=96 %}
+                    <p class="pokemon-tile__number">#{{ saved.species.number }}</p>
+                    <h2 class="pokemon-tile__name">{{ saved.species.name }}</h2>
+                    {% include "partials/_types.html" with types=saved.species.types %}
+                    <p class="pokemon-tile__total">Base stat total: {{ saved.species.stat_total }}</p>
+
+                    <form method="post" action="{% url 'delete_saved_pokemon' saved.pk %}"
+                          onsubmit="return confirm('Remove {{ saved.species.name|escapejs }} from your Pokedex?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn--danger">Remove</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+
+        {% include "partials/_pagination.html" %}
+    {% else %}
+        <p class="empty">
+            You have not saved any Pokemon yet.
+            <a href="{% url 'index' %}">Search for one</a> and it will be added automatically.
+        </p>
+    {% endif %}
+{% endblock %}

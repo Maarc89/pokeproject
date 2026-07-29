@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Battle History{% endblock %}
+
+{% block content %}
+    <h1>Battle History</h1>
+
+    {% if page_obj.paginator.count %}
+        <table class="history-table">
+            <caption class="visually-hidden">Your past battles, most recent first</caption>
+            <thead>
+                <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Matchup</th>
+                    <th scope="col">Score</th>
+                    <th scope="col">Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for battle in page_obj %}
+                    <tr>
+                        <td><time datetime="{{ battle.created_at|date:'c' }}">{{ battle.created_at|date:"j M Y, H:i" }}</time></td>
+                        <td>{{ battle.species_1.name }} vs {{ battle.species_2.name }}</td>
+                        <td>{{ battle.score_1 }}&ndash;{{ battle.score_2 }}</td>
+                        <td>
+                            {% if battle.is_tie %}
+                                <span class="badge">Tie</span>
+                            {% else %}
+                                <span class="badge badge--saved">{{ battle.winner.name }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% include "partials/_pagination.html" %}
+    {% else %}
+        <p class="empty">
+            No battles yet. <a href="{% url 'battle' %}">Start one</a>.
+        </p>
+    {% endif %}
+{% endblock %}

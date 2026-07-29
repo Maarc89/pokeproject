@@ -1,0 +1,13 @@
+{% comment %}
+A Pokemon sprite with explicit dimensions (so nothing jumps as it loads) and a
+graceful empty state -- front_default is legitimately null for some forms.
+Expects `sprite`, `name`, and optionally `size` (defaults to 96).
+{% endcomment %}
+{% if sprite %}
+    <img class="sprite" src="{{ sprite }}" alt="{{ name }}"
+         width="{{ size|default:96 }}" height="{{ size|default:96 }}"
+         loading="lazy" decoding="async">
+{% else %}
+    <div class="sprite sprite--missing" style="--sprite-size: {{ size|default:96 }}px"
+         role="img" aria-label="No sprite available for {{ name }}">?</div>
+{% endif %}

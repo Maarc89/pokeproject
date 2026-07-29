@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Battle Result{% endblock %}
+
+{% block content %}
+    <h1>Battle Result</h1>
+
+    <div class="verdict {% if outcome.is_tie %}verdict--tie{% endif %}">
+        {% if outcome.is_tie %}
+            <h2>It's a tie</h2>
+            <p>Both Pokemon scored {{ outcome.first.total }}.</p>
+        {% else %}
+            <h2>{{ outcome.winner.name }} wins</h2>
+            <p>{{ outcome.winner.total }} to {{ outcome.loser.total }}.</p>
+        {% endif %}
+    </div>
+
+    <div class="battle-grid">
+        {% include "partials/_contender.html" with contender=outcome.first won=outcome.first_won %}
+        {% include "partials/_contender.html" with contender=outcome.second won=outcome.second_won %}
+    </div>
+
+    <section class="card">
+        <h2>Base stats, side by side</h2>
+        <table class="stat-table">
+            <caption class="visually-hidden">
+                Base stat comparison between {{ outcome.first.name }} and {{ outcome.second.name }}
+            </caption>
+            <thead>
+                <tr>
+                    <th scope="col">{{ outcome.first.name }}</th>
+                    <th scope="col">Stat</th>
+                    <th scope="col">{{ outcome.second.name }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in stat_rows %}
+                    <tr>
+                        <td class="stat-table__value {% if row.leader == 'left' %}is-leader{% endif %}">{{ row.left }}</td>
+                        <th scope="row">
+                            {{ row.label }}
+                            <span class="versus-bar" aria-hidden="true">
+                                <span class="versus-bar__left" style="width: {{ row.left_pct }}%"></span>
+                                <span class="versus-bar__right" style="width: {{ row.right_pct }}%"></span>
+                            </span>
+                        </th>
+                        <td class="stat-table__value {% if row.leader == 'right' %}is-leader{% endif %}">{{ row.right }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <div class="actions">
+        <a href="{% url 'battle' %}" class="btn btn--primary">Battle again</a>
+        <a href="{% url 'battle_history' %}" class="btn btn--ghost">View history</a>
+        <a href="{% url 'index' %}" class="btn btn--ghost">Back to search</a>
+    </div>
+{% endblock %}

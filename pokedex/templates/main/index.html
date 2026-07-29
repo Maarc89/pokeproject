@@ -1,74 +1,61 @@
-<!DOCTYPE html>
-<html lang="en">
-<!-- The load static is necessary to load images, css and JS -->
-{% load static %}
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}" crossorigin="anonymous"/>
-    <link rel="icon" href="{% static 'img/pokeball_icon.ico' %}" type="image/x-icon">
-    <title>Pokedex | Django</title>
-</head>
-<body>
-<!-- Inserting the main image -->
-<img src="{% static 'img/pokemon_logo.png' %}" class="image" style="width:400px;">
+{% block title %}Search{% endblock %}
 
-<!-- Botones para loguearse y registrarse -->
-{% if user.is_authenticated %}
-    <p>Hi, {{ user.username }}! <a href="{% url 'logout' %}">Sign out</a></p>
-{% else %}
-    <a href="{% url 'login' %}">
-        <button>Login</button>
-    </a>
-    <a href="{% url 'register' %}">
-        <button>Register</button>
-    </a>
-{% endif %}
+{% block content %}
+    <h1>Pokedex</h1>
 
-<form method="post">
-    <!-- Cross-site request forgery Protection-->
-    {% csrf_token %}
-
-    <!-- Searchbar -->
-    <input type="text" name="pokemon" placeholder="Search Your Pokemon...">
-    <button type="submit">Search</button>
-</form>
-<div>
-    <!-- Rendering everything requested to the API -->
-    <!-- First we validate the data requested -->
-    {% if number and name %}
-        <h3>
-            Number: {{ number }}
-        </h3>
-        <h3>
-            Name: {{ name }}
-        </h3>
-        <h3>
-            Type: {{ types }}
-        </h3>
-        <h3>
-            Abilities: {{ abilities }}
-        </h3>
-        <h3>
-            Default sprite:
-        </h3>
-        <img src="{{ sprite }}" alt="{{ name }} sprite" style="width:100px">
-    {% else %}
-        <div>
-            <h3>
-                Type the name or ID of your pokemon.
-            </h3>
+    <form method="get" class="search-form" data-loading>
+        <div class="field">
+            <label for="{{ form.pokemon.id_for_label }}">{{ form.pokemon.label }}</label>
+            {{ form.pokemon }}
+            {% if form.pokemon.errors %}
+                <p class="field__error">{{ form.pokemon.errors.0 }}</p>
+            {% endif %}
         </div>
-    {% endif %}
-    <!-- Botón para redirigir a la vista de my_pokemon -->
-    {% if user.is_authenticated %}
-        <a href="{% url 'my_pokemon' %}">
-            <button>My Pokémon</button>
-        </a>
-    {% endif %}
+        <button type="submit" class="btn">Search</button>
+    </form>
 
-</div>
-</body>
-</html>
+    {% if profile %}
+        <article class="card pokemon-detail">
+            <header class="pokemon-detail__head">
+                {% include "partials/_sprite.html" with sprite=profile.sprite name=profile.name size=160 %}
+                <div>
+                    <p class="pokemon-detail__number">#{{ profile.number }}</p>
+                    <h2>{{ profile.name }}</h2>
+                    {% include "partials/_types.html" with types=profile.types %}
+                    {% if just_saved %}
+                        <p class="badge badge--saved">Added to your Pokedex</p>
+                    {% elif user.is_authenticated %}
+                        <p class="badge">Already in your Pokedex</p>
+                    {% endif %}
+                </div>
+            </header>
+
+            <dl class="facts">
+                <dt>Abilities</dt>
+                <dd>{{ profile.abilities|join:", " }}</dd>
+                <dt>Base stat total</dt>
+                <dd>{{ profile.stat_total }}</dd>
+            </dl>
+
+            <h3>Base stats</h3>
+            <ul class="stat-list">
+                {% for label, value in profile.stats.items %}
+                    <li class="stat">
+                        <span class="stat__label">{{ label|cut:"-"|title }}</span>
+                        <span class="stat__value">{{ value }}</span>
+                        {# 255 is the highest a base stat goes. #}
+                        <span class="stat__bar"><span class="stat__fill" style="width: {% widthratio value 255 100 %}%"></span></span>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if not user.is_authenticated %}
+                <p class="hint"><a href="{% url 'login' %}">Log in</a> to save Pokemon to your Pokedex.</p>
+            {% endif %}
+        </article>
+    {% elif not form.is_bound %}
+        <p class="empty">Search for a Pokemon by name or number to get started.</p>
+    {% endif %}
+{% endblock %}

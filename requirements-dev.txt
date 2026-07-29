@@ -1,0 +1,5 @@
+-r requirements.txt
+
+ruff==0.16.0
+responses==0.26.2
+coverage==7.15.2

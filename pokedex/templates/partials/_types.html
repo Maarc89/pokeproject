@@ -1,0 +1,11 @@
+{% comment %}
+Renders a Pokemon's types as colour-coded badges.
+Expects `types`: a list of lowercase type slugs, e.g. ["fire", "flying"].
+{% endcomment %}
+{% if types %}
+    <ul class="types">
+        {% for type in types %}
+            <li class="type type--{{ type }}">{{ type|title }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}

@@ -1,0 +1,8 @@
+{% if messages %}
+    {# role="status" so screen readers announce feedback that arrives after a redirect. #}
+    <ul class="messages" role="status" aria-live="polite">
+        {% for message in messages %}
+            <li class="message message--{{ message.tags|default:'info' }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}

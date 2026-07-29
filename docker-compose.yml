@@ -1,0 +1,63 @@
+# Base stack. docker-compose.override.yml adds development conveniences on top
+# automatically; deploy with the base file alone:
+#   docker compose -f docker-compose.yml up -d
+
+x-django-env: &django-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in .env}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+  # Governs HSTS, the HTTPS redirect, and secure cookies as a group. Must be 1
+  # in any real deployment; 0 only for plain-HTTP local runs.
+  DJANGO_BEHIND_TLS: ${DJANGO_BEHIND_TLS:-0}
+  # DatabaseCache is shared across gunicorn workers; LocMemCache would give each
+  # worker its own copy and multiply the PokeAPI traffic.
+  DJANGO_CACHE_BACKEND: ${DJANGO_CACHE_BACKEND:-database}
+  POSTGRES_DB: ${POSTGRES_DB:-pokeproject_db}
+  POSTGRES_USER: ${POSTGRES_USER:-admin}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: 5432
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pokeproject_db}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-pokeproject_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Runs once and exits, so replicas never race to migrate on boot.
+  migrate:
+    build: .
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py createcachetable"
+    environment: *django-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build: .
+    restart: unless-stopped
+    environment: *django-env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
