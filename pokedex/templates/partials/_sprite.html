@@ -1,12 +1,20 @@
 {% comment %}
 A Pokemon sprite with explicit dimensions (so nothing jumps as it loads) and a
 graceful empty state -- front_default is legitimately null for some forms.
-Expects `sprite`, `name`, and optionally `size` (defaults to 96).
+
+Expects `sprite`, `name`, and optionally `sprite_shiny`, `shiny` (bool) and
+`size` (defaults to 96).
+
+Both URLs are emitted as data attributes whether or not shiny is showing, so
+app.js can swap between them without a round trip. A Pokemon with no shiny art
+falls back to the normal sprite rather than vanishing.
 {% endcomment %}
-{% if sprite %}
-    <img class="sprite" src="{{ sprite }}" alt="{{ name }}"
+{% if shiny %}{% firstof sprite_shiny sprite "" as src %}{% else %}{% firstof sprite "" as src %}{% endif %}
+{% if src %}
+    <img class="sprite" src="{{ src }}" alt="{{ name }}"
          width="{{ size|default:96 }}" height="{{ size|default:96 }}"
-         loading="lazy" decoding="async">
+         loading="lazy" decoding="async"
+         data-sprite="{{ sprite }}" data-sprite-shiny="{{ sprite_shiny }}">
 {% else %}
     <div class="sprite sprite--missing" style="--sprite-size: {{ size|default:96 }}px"
          role="img" aria-label="No sprite available for {{ name }}">?</div>

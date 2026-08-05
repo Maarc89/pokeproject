@@ -1,0 +1,26 @@
+{% comment %}
+Normal/shiny switch. Expects `shiny` (bool) from the view.
+
+Two plain links rather than a JS control: the state lives in the URL, so a shiny
+is linkable, survives a refresh, and works with JavaScript off. app.js upgrades
+these into an instant in-place swap.
+
+{% querystring %} carries the rest of the query along, so switching to shiny
+does not reset the type filter, the sort, or the page you were on. Passing None
+drops the parameter entirely rather than leaving ?shiny=0 behind.
+
+partial=None matters: when this renders inside a ?partial=1 fetch, the current
+query still holds partial, and a link that kept it would navigate to a bare
+fragment with no page around it.
+{% endcomment %}
+<div class="shiny-toggle" role="radiogroup" aria-label="Sprite variant" data-shiny-toggle>
+    <a href="{% querystring shiny=None partial=None %}"
+       class="shiny-toggle__option {% if not shiny %}is-active{% endif %}"
+       role="radio" aria-checked="{% if shiny %}false{% else %}true{% endif %}"
+       data-shiny-value="0">Normal</a>
+
+    <a href="{% querystring shiny=1 partial=None %}"
+       class="shiny-toggle__option {% if shiny %}is-active{% endif %}"
+       role="radio" aria-checked="{% if shiny %}true{% else %}false{% endif %}"
+       data-shiny-value="1">&#10022; Shiny</a>
+</div>

@@ -1,6 +1,8 @@
-{# Deliberately standalone: a 500 page must render even when the database,
-   context processors, or static manifest are the thing that is broken, so it
-   extends nothing and links nothing. #}
+{% comment %}
+Deliberately standalone: a 500 page must render even when the database, context
+processors, or static manifest are the thing that is broken, so it extends
+nothing and links nothing.
+{% endcomment %}
 <!DOCTYPE html>
 <html lang="en">
 <head>

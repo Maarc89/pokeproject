@@ -1,0 +1,50 @@
+{% comment %}
+The blow-by-blow. Expects `outcome` (a services.battle.BattleOutcome).
+
+Rendered as an ordered list rather than a table: it is a sequence of events, and
+each entry is one sentence plus a bar, not a row of comparable columns.
+{% endcomment %}
+<section class="card battle-log">
+    <h2>How it played out</h2>
+
+    {% if outcome.stalemate %}
+        <p class="empty">
+            Neither Pokemon can damage the other, so the fight never starts.
+        </p>
+    {% else %}
+        <ol class="battle-log__turns">
+            {% for turn in outcome.turns %}
+                <li class="battle-log__turn {% if turn.attacker_is_first %}battle-log__turn--first{% else %}battle-log__turn--second{% endif %}">
+                    <p class="battle-log__action">
+                        <strong>{{ turn.attacker_name }}</strong>
+                        {% if turn.move %}
+                            used {{ turn.move.display_name }}
+                        {% else %}
+                            has no damaging move
+                        {% endif %}
+                        {% if turn.multiplier != 1 %}
+                            <span class="matchup matchup--{% if turn.multiplier > 1 %}good{% else %}bad{% endif %}">
+                                {{ turn.effectiveness_label }}
+                            </span>
+                        {% endif %}
+                        {% if turn.stab %}<span class="badge">STAB</span>{% endif %}
+                    </p>
+
+                    <p class="battle-log__damage">
+                        {{ turn.damage }} damage &mdash;
+                        {{ turn.defender_name }} on {{ turn.remaining_hp }}/{{ turn.max_hp }} HP
+                    </p>
+
+                    <span class="hp-bar" aria-hidden="true">
+                        <span class="hp-bar__fill hp-bar__fill--{% if turn.remaining_pct > 50 %}high{% elif turn.remaining_pct > 20 %}mid{% else %}low{% endif %}"
+                              style="width: {{ turn.remaining_pct }}%"></span>
+                    </span>
+
+                    {% if turn.fainted %}
+                        <p class="battle-log__faint">{{ turn.defender_name }} fainted.</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+</section>

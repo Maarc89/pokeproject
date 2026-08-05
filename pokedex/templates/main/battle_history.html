@@ -12,7 +12,8 @@
                 <tr>
                     <th scope="col">When</th>
                     <th scope="col">Matchup</th>
-                    <th scope="col">Score</th>
+                    <th scope="col">Damage / turn</th>
+                    <th scope="col">Turns to KO</th>
                     <th scope="col">Result</th>
                 </tr>
             </thead>
@@ -22,6 +23,21 @@
                         <td><time datetime="{{ battle.created_at|date:'c' }}">{{ battle.created_at|date:"j M Y, H:i" }}</time></td>
                         <td>{{ battle.species_1.name }} vs {{ battle.species_2.name }}</td>
                         <td>{{ battle.score_1 }}&ndash;{{ battle.score_2 }}</td>
+                        <td>
+                            {% if battle.turns_1 or battle.turns_2 %}
+                                {% comment %}
+                                default_if_none, not default: a real 0 never
+                                occurs, but "never knocks out" is None.
+                                {% endcomment %}
+                                {{ battle.turns_1|default_if_none:"never" }}&ndash;{{ battle.turns_2|default_if_none:"never" }}
+                            {% else %}
+                                {% comment %}
+                                Recorded before the simulation rewrite, when a
+                                battle was one additive score with no turns.
+                                {% endcomment %}
+                                <span class="muted" title="Recorded under the old scoring">n/a</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if battle.is_tie %}
                                 <span class="badge">Tie</span>

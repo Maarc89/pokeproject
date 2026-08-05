@@ -4,43 +4,74 @@ Expects `contender` (a services.battle.Contender) and `won` (bool).
 {% endcomment %}
 <article class="card contender {% if won %}contender--winner{% endif %}">
     {% if won %}
-        {# A text badge, not just the border colour, so the winner is clear
-           without relying on colour perception. #}
+        {% comment %}
+        A text badge, not just the border colour, so the winner is clear without
+        relying on colour perception. {# #} cannot span lines -- it would render
+        the comment to the page.
+        {% endcomment %}
         <p class="contender__crown">Winner</p>
     {% endif %}
 
     {% include "partials/_sprite.html" with sprite=contender.profile.sprite name=contender.name size=120 %}
 
     <h2>{{ contender.name }}</h2>
-    {% include "partials/_types.html" with types=contender.profile.types %}
+    {% include "partials/_types.html" with types=contender.types %}
 
     <dl class="facts">
-        <dt>Base stats</dt>
-        <dd>{{ contender.stat_score }}</dd>
+        <dt>HP</dt>
+        <dd>{{ contender.hp }}</dd>
 
-        <dt>Strongest move</dt>
+        <dt>Speed</dt>
+        <dd>{{ contender.speed }}</dd>
+
+        <dt>Move chosen</dt>
         <dd>
             {% if contender.best_move %}
                 {{ contender.best_move.display_name }}
-                <span class="muted">({{ contender.best_move.type|title }}, power {{ contender.move_power }})</span>
-                {% if contender.stab %}
+                <span class="muted">({{ contender.attack.move.type|title }}, power {{ contender.attack.move.power }})</span>
+                {% if contender.attack.stab %}
                     <span class="badge badge--saved" title="Same Type Attack Bonus: the move matches this Pokemon's own type">STAB &times;1.5</span>
+                {% endif %}
+                {% if contender.attack.accuracy < 100 %}
+                    <span class="badge" title="An inaccurate move deals less damage on average">{{ contender.attack.accuracy }}% accurate</span>
+                {% endif %}
+                {% if contender.attack.turn_cost > 1 %}
+                    <span class="badge" title="This move needs a charge or recharge turn, so it only lands every other turn">Every other turn</span>
                 {% endif %}
             {% else %}
                 <span class="muted">No damaging move</span>
             {% endif %}
         </dd>
 
+        {% if contender.best_move %}
+            <dt>Stats used</dt>
+            <dd>
+                {{ contender.attack.attack_label }}
+                <span class="muted">({{ contender.attack.attack_stat }} vs {{ contender.attack.defense_stat }})</span>
+            </dd>
+        {% endif %}
+
         <dt>Type matchup</dt>
         <dd>
-            <span class="matchup matchup--{% if contender.multiplier > 1 %}good{% elif contender.multiplier < 1 %}bad{% else %}neutral{% endif %}">
-                {{ contender.multiplier|floatformat:"-2" }}&times; &mdash; {{ contender.effectiveness_label }}
+            <span class="matchup matchup--{% if contender.attack.multiplier > 1 %}good{% elif contender.attack.multiplier < 1 %}bad{% else %}neutral{% endif %}">
+                {{ contender.attack.multiplier|floatformat:"-2" }}&times; &mdash; {{ contender.attack.effectiveness_label }}
             </span>
         </dd>
 
-        <dt>Move contribution</dt>
-        <dd>{{ contender.move_score }}</dd>
+        <dt>Damage per turn</dt>
+        <dd>
+            <strong>{{ contender.attack.damage }}</strong>
+            {% if contender.attack.is_unreliable %}
+                <span class="muted">(averaged; {{ contender.attack.hit_damage }} on a clean hit)</span>
+            {% endif %}
+        </dd>
     </dl>
 
-    <p class="contender__total">Total <strong>{{ contender.total }}</strong></p>
+    <p class="contender__total">
+        {% if contender.turns_to_ko %}
+            Knocks out in <strong>{{ contender.turns_to_ko }}</strong> turn{{ contender.turns_to_ko|pluralize }}
+        {% else %}
+            <span class="muted">Cannot knock out</span>
+        {% endif %}
+    </p>
 </article>

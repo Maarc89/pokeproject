@@ -6,13 +6,20 @@ battle scored on base stats and type matchups.
 
 ## Features
 
-- **Search** by name or number. Results are shareable URLs (`/?pokemon=pikachu`).
+- **Search** by name or number. Results are shareable URLs (`/?pokemon=pikachu`),
+  and searching swaps the result in place rather than reloading the page.
+- **Pokedex entries** — the classic description, category, height and weight,
+  habitat, the Pokemon's cry, what it is weak and resistant to, and its full
+  evolution line with the conditions for each step.
+- **Shiny forms** — a toggle on any Pokemon or your whole collection
+  (`/?pokemon=gyarados&shiny=1`). Linkable, and it works with JavaScript off.
 - **Your Pokedex** — anything you search while logged in is saved. Filter by
   type, sort, paginate, remove.
-- **Battle** — two Pokemon compared on base stats plus their strongest move,
-  weighted by the full 18-type effectiveness chart and STAB. Water really does
-  beat fire.
-- **Battle history** — every result is recorded.
+- **Battle** — a real fight at level 50. Each Pokemon picks its best move
+  *against the other*, damage runs through the standard formula (physical moves
+  read Defense, special moves read Sp. Def), and whoever knocks the other out
+  first wins. Speed decides who swings first. Water really does beat fire.
+- **Battle history** — every result is recorded, with a turn-by-turn log.
 - Type-coloured badges, per-stat comparison bars, dark mode, keyboard
   navigation, and a responsive layout.
 
@@ -91,7 +98,7 @@ python manage.py runserver
 ## Tests
 
 ```bash
-python manage.py test          # 89 tests
+python manage.py test          # 179 tests
 ruff check .
 coverage run manage.py test && coverage report
 ```
@@ -114,24 +121,34 @@ Three things keep that affordable:
 1. Search never fetches move data at all; only the battle screen needs it.
 2. Move data is immutable, so it is cached and stored locally and fetched at
    most once ever.
-3. The remaining misses are fetched concurrently.
+3. The remaining misses are fetched concurrently, and are then pruned to the
+   strongest move of each type and damage class — the only ones that could ever
+   be the best choice against anything.
 
 A cold battle takes about a second; a repeat is instant. Please keep the cache
 enabled rather than hammering a free public API.
+
+Shiny art, height, weight and the cry cost nothing extra: they are already in
+the response a search makes. A Pokedex entry adds two more cached requests, for
+the species description and the evolution line — the latter keyed on the family,
+so the rest of a chain is free once you have looked at one of its members.
 
 ## Project layout
 
 ```
 pokedex/
-  data/type_chart.py     18x18 type effectiveness table (static data)
+  data/type_chart.py     18x18 type table, plus each type's defensive profile
   services/pokeapi.py    all outbound HTTP, caching, and concurrency
-  services/battle.py     scoring, STAB, type matchups
+  services/battle.py     damage formula, move choice, turn simulation
   forms.py               search, battle, and registration forms
   models.py              Move, PokemonSpecies, SavedPokemon, Battle
   templates/             base.html + partials; every page extends it
+    main/_pokemon_detail.html   the search result, shared by the full page
+                                render and the ?partial=1 fetch
 static/
   css/styles.css         design tokens, light/dark, type colours
-  js/app.js              loading states, autocomplete, sprite fallbacks
+  js/app.js              loading states, autocomplete, sprite fallbacks,
+                         shiny swap, and in-place search
 ```
 
 ## License

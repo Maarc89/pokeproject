@@ -37,14 +37,38 @@ class PokemonSpecies(models.Model):
     name = models.CharField(max_length=100, db_index=True)
     types = models.JSONField(default=list)
     abilities = models.JSONField(default=list)
+    # Four images, all present in the one /pokemon/ payload we already fetch --
+    # shiny forms cost no extra requests, they were simply being discarded.
+    # sprite* are the 96px game sprites; artwork* is the high-resolution
+    # official art, which is what the detail page shows.
     sprite = models.URLField(blank=True)
+    sprite_shiny = models.URLField(blank=True)
+    artwork = models.URLField(blank=True)
+    artwork_shiny = models.URLField(blank=True)
     stats = models.JSONField(default=dict)
+
+    # Reported by the API in decimetres and hectograms; templates convert.
+    height = models.PositiveSmallIntegerField(default=0)
+    weight = models.PositiveIntegerField(default=0)
+    base_experience = models.PositiveSmallIntegerField(default=0)
+    cry = models.URLField(blank=True)
+    # The signature move shown in Pokedex listings: strongest overall, chosen
+    # with no opponent in mind. A battle does not use this -- see
+    # `candidate_moves` -- but a list page has nobody to compare against.
     best_move = models.ForeignKey(
         Move,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="strongest_for",
+    )
+    # The moves a battle may choose between: the strongest of each
+    # (type, damage class) pair, since the rest can never beat them. Shared
+    # rather than copied, for the same reason species rows are.
+    candidate_moves = models.ManyToManyField(
+        Move,
+        blank=True,
+        related_name="candidate_for",
     )
     fetched_at = models.DateTimeField(auto_now=True)
 
@@ -59,6 +83,14 @@ class PokemonSpecies(models.Model):
     @property
     def stat_total(self):
         return sum(self.stats.values()) if self.stats else 0
+
+    @property
+    def height_m(self):
+        return self.height / 10
+
+    @property
+    def weight_kg(self):
+        return self.weight / 10
 
 
 class SavedPokemon(models.Model):
@@ -111,8 +143,13 @@ class Battle(models.Model):
         on_delete=models.SET_NULL,
         related_name="battles_won",
     )
+    # Damage dealt per turn. Rows created before the simulation rewrite hold the
+    # old additive score instead, which is not comparable -- hence turns_*
+    # being null for exactly those rows.
     score_1 = models.PositiveIntegerField()
     score_2 = models.PositiveIntegerField()
+    turns_1 = models.PositiveSmallIntegerField(null=True, blank=True)
+    turns_2 = models.PositiveSmallIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
