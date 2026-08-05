@@ -5,7 +5,7 @@
 {% block content %}
     <h1>Pokedex</h1>
 
-    <form method="get" class="search-form" data-loading>
+    <form method="get" class="search-form" data-loading data-search-form>
         <div class="field">
             <label for="{{ form.pokemon.id_for_label }}">{{ form.pokemon.label }}</label>
             {{ form.pokemon }}
@@ -16,46 +16,16 @@
         <button type="submit" class="btn">Search</button>
     </form>
 
-    {% if profile %}
-        <article class="card pokemon-detail">
-            <header class="pokemon-detail__head">
-                {% include "partials/_sprite.html" with sprite=profile.sprite name=profile.name size=160 %}
-                <div>
-                    <p class="pokemon-detail__number">#{{ profile.number }}</p>
-                    <h2>{{ profile.name }}</h2>
-                    {% include "partials/_types.html" with types=profile.types %}
-                    {% if just_saved %}
-                        <p class="badge badge--saved">Added to your Pokedex</p>
-                    {% elif user.is_authenticated %}
-                        <p class="badge">Already in your Pokedex</p>
-                    {% endif %}
-                </div>
-            </header>
-
-            <dl class="facts">
-                <dt>Abilities</dt>
-                <dd>{{ profile.abilities|join:", " }}</dd>
-                <dt>Base stat total</dt>
-                <dd>{{ profile.stat_total }}</dd>
-            </dl>
-
-            <h3>Base stats</h3>
-            <ul class="stat-list">
-                {% for label, value in profile.stats.items %}
-                    <li class="stat">
-                        <span class="stat__label">{{ label|cut:"-"|title }}</span>
-                        <span class="stat__value">{{ value }}</span>
-                        {# 255 is the highest a base stat goes. #}
-                        <span class="stat__bar"><span class="stat__fill" style="width: {% widthratio value 255 100 %}%"></span></span>
-                    </li>
-                {% endfor %}
-            </ul>
-
-            {% if not user.is_authenticated %}
-                <p class="hint"><a href="{% url 'login' %}">Log in</a> to save Pokemon to your Pokedex.</p>
-            {% endif %}
-        </article>
-    {% elif not form.is_bound %}
-        <p class="empty">Search for a Pokemon by name or number to get started.</p>
-    {% endif %}
+    {% comment %}
+    The result lives in its own container so app.js can replace just this part.
+    aria-live because a swapped fragment produces no page-load announcement of
+    its own, and a screen reader would otherwise not be told anything arrived.
+    {% endcomment %}
+    <div id="search-result" data-search-result aria-live="polite">
+        {% if profile %}
+            {% include "main/_pokemon_detail.html" %}
+        {% elif not form.is_bound %}
+            <p class="empty">Search for a Pokemon by name or number to get started.</p>
+        {% endif %}
+    </div>
 {% endblock %}

@@ -1,0 +1,101 @@
+{% comment %}
+The search result on its own, so the same markup serves both a full page render
+and the ?partial=1 fetch that app.js swaps in. Extracted rather than duplicated:
+two copies would drift the moment either changed.
+{% endcomment %}
+<article class="card pokemon-detail">
+    <header class="pokemon-detail__head">
+        {% comment %}
+        Official artwork here rather than the 96px sprite: at 160px the game
+        sprite is upscaled mush. Falls back to the sprite for the handful of
+        forms with no artwork.
+        {% endcomment %}
+        {% firstof profile.artwork profile.sprite as detail_art %}
+        {% firstof profile.artwork_shiny profile.sprite_shiny as detail_art_shiny %}
+        {% include "partials/_sprite.html" with sprite=detail_art sprite_shiny=detail_art_shiny name=profile.name size=160 %}
+        <div>
+            <p class="pokemon-detail__number">#{{ profile.number }}</p>
+            <h2>{{ profile.name }}</h2>
+            {% include "partials/_types.html" with types=profile.types %}
+            {% include "partials/_shiny_toggle.html" %}
+            {% if just_saved %}
+                <p class="badge badge--saved">Added to your Pokedex</p>
+            {% elif user.is_authenticated %}
+                <p class="badge">Already in your Pokedex</p>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if species.flavor_text %}
+        <p class="pokedex-entry">{{ species.flavor_text }}</p>
+    {% endif %}
+
+    <dl class="facts">
+        {% if species.genus %}
+            <dt>Category</dt>
+            <dd>{{ species.genus }}</dd>
+        {% endif %}
+        <dt>Abilities</dt>
+        <dd>{{ profile.abilities|join:", " }}</dd>
+        {% if profile.height %}
+            <dt>Height</dt>
+            <dd>{{ profile.height_m|floatformat:"-1" }}&nbsp;m</dd>
+        {% endif %}
+        {% if profile.weight %}
+            <dt>Weight</dt>
+            <dd>{{ profile.weight_kg|floatformat:"-1" }}&nbsp;kg</dd>
+        {% endif %}
+        <dt>Base stat total</dt>
+        <dd>{{ profile.stat_total }}</dd>
+        {% if species.habitat %}
+            <dt>Habitat</dt>
+            <dd>{{ species.habitat }}</dd>
+        {% endif %}
+        {% if species.generation %}
+            <dt>Introduced in</dt>
+            <dd>Generation {{ species.generation }}</dd>
+        {% endif %}
+    </dl>
+
+    {% if species.is_legendary or species.is_mythical %}
+        <p class="badge badge--rare">
+            {% if species.is_mythical %}Mythical{% else %}Legendary{% endif %}
+        </p>
+    {% endif %}
+
+    {% if profile.cry %}
+        {% comment %}
+        controls + preload="none": a cry is a novelty, so it must never autoplay
+        and must not cost bandwidth until asked for.
+        {% endcomment %}
+        <div class="cry">
+            <span class="cry__label">Cry</span>
+            <audio controls preload="none" src="{{ profile.cry }}">
+                Your browser cannot play this Pokemon's cry.
+            </audio>
+        </div>
+    {% endif %}
+
+    <h3>Base stats</h3>
+    <ul class="stat-list">
+        {% for row in profile.stat_rows %}
+            <li class="stat">
+                <span class="stat__label">{{ row.label }}</span>
+                <span class="stat__value">{{ row.value }}</span>
+                {# 255 is the highest a base stat goes. #}
+                <span class="stat__bar"><span class="stat__fill" style="width: {% widthratio row.value 255 100 %}%"></span></span>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if user.is_authenticated %}
+        <p class="hint">
+            <a class="btn btn--ghost" href="{% url 'battle' %}?first={{ profile.slug|urlencode }}">Battle this Pokemon</a>
+        </p>
+    {% else %}
+        <p class="hint"><a href="{% url 'login' %}">Log in</a> to save Pokemon to your Pokedex.</p>
+    {% endif %}
+</article>
+
+{% include "partials/_defensive.html" %}
+{% include "partials/_evolutions.html" %}

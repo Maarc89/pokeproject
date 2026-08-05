@@ -1,0 +1,29 @@
+{% comment %}
+The evolution family. Expects `species.evolutions`: a list of stages, each a
+list of Pokemon.
+
+Stages rather than a flat line because a chain is a tree -- Eevee branches into
+eight -- so one stage can hold several Pokemon. Each is a link back into search,
+which is how you move through a family.
+{% endcomment %}
+{% if species.evolutions|length > 1 %}
+    <section class="card evolutions">
+        <h3>Evolution line</h3>
+
+        <ol class="evolutions__stages">
+            {% for stage in species.evolutions %}
+                <li class="evolutions__stage">
+                    {% for member in stage %}
+                        <a class="evolutions__member" href="{% url 'index' %}?pokemon={{ member.slug|urlencode }}">
+                            {% include "partials/_sprite.html" with sprite=member.sprite sprite_shiny="" name=member.name size=72 shiny=False %}
+                            <span class="evolutions__name">{{ member.name }}</span>
+                            {% if member.trigger %}
+                                <span class="evolutions__trigger">{{ member.trigger }}</span>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                </li>
+            {% endfor %}
+        </ol>
+    </section>
+{% endif %}

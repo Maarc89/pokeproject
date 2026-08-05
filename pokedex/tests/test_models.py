@@ -71,6 +71,28 @@ class MoveTests(TestCase):
         species.refresh_from_db()
         self.assertIsNone(species.best_move)
 
+    def test_candidate_moves_are_shared_between_species(self):
+        """One Move row per move, however many Pokemon learn it."""
+        earthquake = Move.objects.create(name="earthquake", power=100, type="ground")
+        one = PokemonSpecies.objects.create(number=1, slug="a", name="A")
+        two = PokemonSpecies.objects.create(number=2, slug="b", name="B")
+
+        one.candidate_moves.add(earthquake)
+        two.candidate_moves.add(earthquake)
+
+        self.assertEqual(Move.objects.filter(name="earthquake").count(), 1)
+        self.assertEqual(earthquake.candidate_for.count(), 2)
+        self.assertIn(earthquake, one.candidate_moves.all())
+
+    def test_deleting_a_move_drops_it_from_the_moveset(self):
+        move = Move.objects.create(name="tackle", power=40)
+        species = PokemonSpecies.objects.create(number=1, slug="a", name="A")
+        species.candidate_moves.add(move)
+
+        move.delete()
+
+        self.assertEqual(species.candidate_moves.count(), 0)
+
 
 class BattleModelTests(TestCase):
     def setUp(self):
@@ -92,6 +114,24 @@ class BattleModelTests(TestCase):
         )
         self.assertFalse(battle.is_tie)
         self.assertIn("Blastoise", str(battle))
+
+    def test_turns_are_recorded(self):
+        battle = Battle.objects.create(
+            user=self.user, species_1=self.a, species_2=self.b,
+            winner=self.a, score_1=62, score_2=31, turns_1=3, turns_2=5,
+        )
+        battle.refresh_from_db()
+        self.assertEqual((battle.turns_1, battle.turns_2), (3, 5))
+
+    def test_turns_are_null_for_a_side_that_can_never_knock_out(self):
+        """None, not 0 -- "never" and "instantly" must not collapse together."""
+        battle = Battle.objects.create(
+            user=self.user, species_1=self.a, species_2=self.b,
+            winner=self.a, score_1=40, score_2=0, turns_1=4, turns_2=None,
+        )
+        battle.refresh_from_db()
+        self.assertEqual(battle.turns_1, 4)
+        self.assertIsNone(battle.turns_2)
 
     def test_ordered_most_recent_first(self):
         first = Battle.objects.create(

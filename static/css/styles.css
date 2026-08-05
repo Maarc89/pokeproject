@@ -548,6 +548,226 @@ code {
 .matchup--bad { color: var(--danger); }
 .matchup--neutral { color: var(--text-muted); }
 
+/* Quick picks and tile actions */
+
+.quick-picks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.pokemon-tile__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: center;
+    margin-block-start: auto;
+}
+
+/* Rematch and swap are separate forms so each can POST its own pairing, but
+   the row has to read as one group of buttons. */
+.actions { align-items: center; }
+.actions form { margin: 0; }
+
+/* Pokedex entry, matchups, evolutions */
+
+.pokedex-entry {
+    margin: 0 0 var(--space-4);
+    padding-inline-start: var(--space-4);
+    border-inline-start: 3px solid var(--brand-yellow);
+    font-size: 1.05rem;
+    line-height: 1.6;
+    max-width: var(--measure);
+}
+
+.matchups__heading {
+    margin: var(--space-4) 0 var(--space-2);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.matchups__heading:first-of-type { margin-block-start: 0; }
+
+.badge--rare {
+    background: var(--brand-yellow);
+    color: #3a2c00;
+    font-weight: 800;
+}
+
+.cry {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-block-start: var(--space-4);
+}
+
+.cry__label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.cry audio { height: 2rem; max-width: 100%; }
+
+.evolutions__stages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-4);
+}
+
+.evolutions__stage {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+/* The arrow between stages is decorative, so it is generated rather than
+   marked up -- a screen reader reads the list order instead. */
+.evolutions__stage + .evolutions__stage::before {
+    content: "\2192";
+    align-self: center;
+    margin-inline-end: var(--space-2);
+    color: var(--text-muted);
+    font-size: 1.5rem;
+}
+
+.evolutions__member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: inherit;
+    text-align: center;
+}
+
+.evolutions__member:hover { background: var(--surface-alt); }
+
+.evolutions__member:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.evolutions__name { font-weight: 600; }
+
+.evolutions__trigger {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Normal / shiny toggle */
+
+.shiny-toggle {
+    display: inline-flex;
+    margin-block-start: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-alt);
+    overflow: hidden;
+}
+
+.shiny-toggle__option {
+    padding: var(--space-1) var(--space-4);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text-muted);
+}
+
+.shiny-toggle__option:hover { color: var(--text); }
+
+.shiny-toggle__option.is-active {
+    background: var(--brand-yellow);
+    /* Fixed dark ink rather than --text: the yellow does not change between
+       themes, so a theme-following colour would fail contrast in dark mode. */
+    color: #3a2c00;
+}
+
+.shiny-toggle__option:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.collection-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+/* Battle log */
+
+.battle-log__turns {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-3);
+}
+
+.battle-log__turn {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    /* Which side is acting, without depending on colour alone -- the inline
+       start border reads as an indent even in monochrome. */
+    border-inline-start: 4px solid var(--brand-blue);
+}
+
+.battle-log__turn--second { border-inline-start-color: var(--type-fire); }
+
+.battle-log__action { margin: 0 0 var(--space-1); }
+
+.battle-log__damage {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.battle-log__faint {
+    margin: var(--space-2) 0 0;
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.hp-bar {
+    display: block;
+    height: 0.4rem;
+    margin-block-start: var(--space-2);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--border);
+}
+
+.hp-bar__fill {
+    display: block;
+    height: 100%;
+    /* Colour is a reinforcement; the numeric HP is always printed above. */
+    transition: width 120ms linear;
+}
+
+.hp-bar__fill--high { background: var(--success); }
+.hp-bar__fill--mid { background: var(--brand-yellow-dark); }
+.hp-bar__fill--low { background: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+    .hp-bar__fill { transition: none; }
+}
+
 .stat-table,
 .history-table {
     width: 100%;

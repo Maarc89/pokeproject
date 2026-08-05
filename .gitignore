@@ -21,6 +21,10 @@ __pycache__/
 staticfiles/
 media/
 
+# Test coverage artifacts
+.coverage
+htmlcov/
+
 # Logs
 *.log
 

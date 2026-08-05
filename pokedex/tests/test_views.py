@@ -82,6 +82,314 @@ class SearchTests(TestCase):
         self.assertEqual(SavedPokemon.objects.count(), 1)
 
 
+class LiveSearchTests(TestCase):
+    """?partial=1 returns just the result, for the in-place swap."""
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_partial_returns_the_fragment_alone(self, fetch):
+        fetch.return_value = profile()
+
+        response = self.client.get(
+            reverse("index"), {"pokemon": "pikachu", "partial": "1"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pikachu")
+        # No page furniture: this is spliced into an existing document.
+        self.assertNotContains(response, "<!DOCTYPE html>")
+        self.assertNotContains(response, "site-header")
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_fragment_and_the_full_page_agree(self, fetch):
+        """One template, so the two renders cannot drift apart."""
+        fetch.return_value = profile()
+
+        full = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+        partial = self.client.get(
+            reverse("index"), {"pokemon": "pikachu", "partial": "1"}
+        )
+
+        self.assertIn(partial.content.decode().strip(), full.content.decode())
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_partial_honours_shiny(self, fetch):
+        fetch.return_value = profile()
+
+        response = self.client.get(
+            reverse("index"), {"pokemon": "pikachu", "partial": "1", "shiny": "1"}
+        )
+
+        self.assertContains(response, "pikachu-art-shiny.png")
+
+    def test_partial_without_a_search_falls_back_to_the_full_page(self):
+        """Nothing to splice in, so there is no fragment to return."""
+        response = self.client.get(reverse("index"), {"partial": "1"})
+
+        self.assertContains(response, "<!DOCTYPE html>")
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_missing_pokemon_still_renders_the_error_page(self, fetch):
+        """The JS gives up on a non-200 and navigates, so this must be complete."""
+        fetch.side_effect = PokemonNotFound("nosuchmon")
+
+        response = self.client.get(
+            reverse("index"), {"pokemon": "nosuchmon", "partial": "1"}
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "<!DOCTYPE html>", status_code=404)
+
+
+class BattlePrefillTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("ash", password=PASSWORD)
+        self.client.login(username="ash", password=PASSWORD)
+        self.species = PokemonSpecies.objects.create(
+            number=25, slug="pikachu", name="Pikachu", types=["electric"]
+        )
+        SavedPokemon.objects.create(user=self.user, species=self.species)
+
+    def test_first_and_second_prefill_the_form(self):
+        response = self.client.get(
+            reverse("battle"), {"first": "pikachu", "second": "charizard"}
+        )
+
+        self.assertContains(response, 'value="pikachu"')
+        self.assertContains(response, 'value="charizard"')
+
+    def test_saved_pokemon_are_offered_as_quick_picks(self):
+        response = self.client.get(reverse("battle"))
+
+        self.assertContains(response, "From your Pokedex")
+        self.assertContains(response, "Pikachu")
+
+    def test_a_quick_pick_fills_the_second_slot_once_the_first_is_taken(self):
+        response = self.client.get(reverse("battle"), {"first": "charizard"})
+
+        # The slug, not the display name -- a URL carrying "Mr. Mime" reads wrong.
+        self.assertContains(response, "second=pikachu")
+        self.assertContains(response, "first=charizard")
+
+    def test_only_your_own_pokemon_are_offered(self):
+        misty = User.objects.create_user("misty", password=PASSWORD)
+        other = PokemonSpecies.objects.create(
+            number=7, slug="squirtle", name="Squirtle", types=["water"]
+        )
+        SavedPokemon.objects.create(user=misty, species=other)
+
+        response = self.client.get(reverse("battle"))
+
+        self.assertNotContains(response, "Squirtle")
+
+
+class RematchTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("ash", password=PASSWORD)
+        self.client.login(username="ash", password=PASSWORD)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_result_offers_a_rematch_and_a_swap(self, fetch):
+        fetch.side_effect = [
+            profile(number=25, name="Pikachu", best_move=move()),
+            profile(number=6, name="Charizard", types=("fire",), best_move=move()),
+        ]
+
+        response = self.client.post(
+            reverse("battle_result"), {"pokemon1": "pikachu", "pokemon2": "charizard"}
+        )
+
+        self.assertContains(response, "Rematch")
+        self.assertContains(response, "Swap sides")
+        # Slugs, not the raw input, so a rematch of "25" replays as pikachu.
+        self.assertContains(response, 'name="pokemon1" value="pikachu"')
+        self.assertContains(response, 'name="pokemon2" value="charizard"')
+        self.assertContains(response, 'name="pokemon1" value="charizard"')
+
+
+class PokedexDetailTests(TestCase):
+    """Species enrichment on the search page."""
+
+    SPECIES = {
+        "genus": "Mouse Pokemon",
+        "flavor_text": "It keeps its tail raised to monitor its surroundings.",
+        "is_legendary": False,
+        "is_mythical": False,
+        "habitat": "Forest",
+        "generation": "I",
+        "evolutions": [
+            [{"slug": "pichu", "name": "Pichu", "number": 172, "sprite": "", "trigger": ""}],
+            [{"slug": "pikachu", "name": "Pikachu", "number": 25, "sprite": "",
+              "trigger": "High friendship"}],
+        ],
+    }
+
+    @patch("pokedex.views.fetch_species_details")
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_shows_the_pokedex_entry(self, fetch, species):
+        fetch.return_value = profile()
+        species.return_value = dict(self.SPECIES)
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, "It keeps its tail raised")
+        self.assertContains(response, "Mouse Pokemon")
+        self.assertContains(response, "Generation I")
+
+    @patch("pokedex.views.fetch_species_details")
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_shows_height_weight_and_cry(self, fetch, species):
+        fetch.return_value = profile()
+        species.return_value = dict(self.SPECIES)
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, "0.4&nbsp;m")
+        self.assertContains(response, "6&nbsp;kg")
+        # Never autoplay: a cry is a novelty, not an announcement.
+        self.assertContains(response, 'preload="none"')
+
+    @patch("pokedex.views.fetch_species_details")
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_shows_the_evolution_line(self, fetch, species):
+        fetch.return_value = profile()
+        species.return_value = dict(self.SPECIES)
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, "Evolution line")
+        self.assertContains(response, "Pichu")
+        self.assertContains(response, "High friendship")
+
+    @patch("pokedex.views.fetch_species_details")
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_single_stage_family_shows_no_evolution_section(self, fetch, species):
+        fetch.return_value = profile()
+        species.return_value = dict(self.SPECIES, evolutions=[[{"name": "Ditto"}]])
+
+        response = self.client.get(reverse("index"), {"pokemon": "ditto"})
+
+        self.assertNotContains(response, "Evolution line")
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_defensive_matchups_are_computed_locally(self, fetch):
+        """No API call: the type chart is local data."""
+        fetch.return_value = profile(types=("electric",))
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, "Type matchups")
+        self.assertContains(response, "Weak to")
+        self.assertContains(response, "Ground")
+
+    @patch("pokedex.views.fetch_species_details")
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_species_failure_costs_the_description_not_the_pokemon(self, fetch, species):
+        """Enrichment must degrade, never 503 a page that already succeeded."""
+        fetch.return_value = profile()
+        species.side_effect = PokeAPIUnavailable("species endpoint down")
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pikachu")
+        self.assertContains(response, "Type matchups")
+        self.assertNotContains(response, "Evolution line")
+
+
+class ShinyToggleTests(TestCase):
+    """?shiny=1 has to survive being linked, filtered and paginated."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("ash", password=PASSWORD)
+        self.client.login(username="ash", password=PASSWORD)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_search_shows_normal_art_by_default(self, fetch):
+        fetch.return_value = profile()
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, "pikachu-art.png")
+        self.assertNotContains(response, 'src="https://example.invalid/pikachu-art-shiny.png"')
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_search_shows_shiny_art_when_asked(self, fetch):
+        fetch.return_value = profile()
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu", "shiny": "1"})
+
+        self.assertContains(response, 'src="https://example.invalid/pikachu-art-shiny.png"')
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_both_urls_are_emitted_for_the_client_side_swap(self, fetch):
+        fetch.return_value = profile()
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, 'data-sprite="https://example.invalid/pikachu-art.png"')
+        self.assertContains(
+            response, 'data-sprite-shiny="https://example.invalid/pikachu-art-shiny.png"'
+        )
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_toggle_keeps_the_search_term(self, fetch):
+        """Switching to shiny must not throw away what you searched for."""
+        fetch.return_value = profile()
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu"})
+
+        self.assertContains(response, "pokemon=pikachu&amp;shiny=1")
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_pokemon_without_shiny_art_falls_back(self, fetch):
+        fetch.return_value = profile(artwork_shiny="", sprite_shiny="")
+
+        response = self.client.get(reverse("index"), {"pokemon": "pikachu", "shiny": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "pikachu-art.png")
+
+    def test_collection_toggle_keeps_filter_and_sort(self):
+        species = PokemonSpecies.objects.create(
+            number=25, slug="pikachu", name="Pikachu", types=["electric"],
+            sprite="https://example.invalid/p.png",
+            sprite_shiny="https://example.invalid/p-shiny.png",
+        )
+        SavedPokemon.objects.create(user=self.user, species=species)
+
+        response = self.client.get(
+            reverse("my_pokemon"), {"type": "electric", "sort": "name"}
+        )
+
+        content = response.content.decode()
+        self.assertIn("shiny=1", content)
+        self.assertIn("type=electric", content)
+        self.assertIn("sort=name", content)
+
+    def test_collection_renders_shiny_sprites(self):
+        species = PokemonSpecies.objects.create(
+            number=25, slug="pikachu", name="Pikachu", types=["electric"],
+            sprite="https://example.invalid/p.png",
+            sprite_shiny="https://example.invalid/p-shiny.png",
+        )
+        SavedPokemon.objects.create(user=self.user, species=species)
+
+        response = self.client.get(reverse("my_pokemon"), {"shiny": "1"})
+
+        self.assertContains(response, 'src="https://example.invalid/p-shiny.png"')
+
+    def test_the_filter_form_carries_shiny_through(self):
+        """The filter form replaces the query string, so it must resubmit shiny."""
+        species = PokemonSpecies.objects.create(
+            number=25, slug="pikachu", name="Pikachu", types=["electric"]
+        )
+        SavedPokemon.objects.create(user=self.user, species=species)
+
+        response = self.client.get(reverse("my_pokemon"), {"shiny": "1"})
+
+        self.assertContains(response, '<input type="hidden" name="shiny" value="1">')
+
+
 class MyPokemonTests(TestCase):
     def setUp(self):
         self.ash = User.objects.create_user("ash", password=PASSWORD)

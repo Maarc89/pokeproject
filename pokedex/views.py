@@ -11,13 +11,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 
+from .data.type_chart import defensive_profile
 from .forms import BattleForm, PokemonSearchForm, RegistrationForm
 from .models import Battle, Move, PokemonSpecies, SavedPokemon
 from .services import battle as battle_service
 from .services.pokeapi import (
+    PokeAPIError,
     PokeAPIUnavailable,
     PokemonNotFound,
     fetch_pokemon_profile,
+    fetch_species_details,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +37,30 @@ def _upstream_error(request):
     return render(request, "main/upstream_error.html", status=503)
 
 
+def _wants_shiny(request):
+    """Whether to show shiny art, from `?shiny=1`.
+
+    In the URL rather than the session so a shiny is linkable and a refresh
+    keeps it -- the same reason search is a GET.
+    """
+    return request.GET.get("shiny") in {"1", "true", "on"}
+
+
+def _species_details(number):
+    """Pokedex-entry extras, or None if they could not be fetched.
+
+    Deliberately swallows every PokeAPI failure: this is enrichment on a page
+    that has already succeeded, so a flaky species endpoint should cost the
+    reader a description, not the Pokemon. Mirrors how a single unfetchable
+    move weakens a battle rather than failing it.
+    """
+    try:
+        return fetch_species_details(number)
+    except PokeAPIError:
+        logger.warning("Species details unavailable for #%s", number, exc_info=True)
+        return None
+
+
 @transaction.atomic
 def sync_species(profile):
     """Persist (or refresh) the local copy of a Pokemon fetched from PokeAPI.
@@ -42,17 +69,23 @@ def sync_species(profile):
     corrected upstream data instead of staying frozen at whatever it looked like
     the first time anyone searched for it.
     """
+    def store(payload):
+        stored, _ = Move.objects.update_or_create(
+            name=payload["name"],
+            defaults={
+                "power": payload["power"],
+                "type": payload["type"],
+                "damage_class": payload["damage_class"],
+            },
+        )
+        return stored
+
     move = None
     best_move = profile.get("best_move")
     if best_move:
-        move, _ = Move.objects.update_or_create(
-            name=best_move["name"],
-            defaults={
-                "power": best_move["power"],
-                "type": best_move["type"],
-                "damage_class": best_move["damage_class"],
-            },
-        )
+        move = store(best_move)
+
+    candidates = [store(payload) for payload in profile.get("moves") or []]
 
     defaults = {
         "slug": profile["slug"],
@@ -60,7 +93,14 @@ def sync_species(profile):
         "types": profile["types"],
         "abilities": profile["abilities"],
         "sprite": profile["sprite"],
+        "sprite_shiny": profile.get("sprite_shiny", ""),
+        "artwork": profile.get("artwork", ""),
+        "artwork_shiny": profile.get("artwork_shiny", ""),
         "stats": profile["stats"],
+        "height": profile.get("height", 0),
+        "weight": profile.get("weight", 0),
+        "base_experience": profile.get("base_experience", 0),
+        "cry": profile.get("cry", ""),
     }
     # Only overwrite best_move when this fetch actually resolved one, so a cheap
     # search does not wipe the move a previous battle lookup stored.
@@ -70,6 +110,12 @@ def sync_species(profile):
     species, _ = PokemonSpecies.objects.update_or_create(
         number=profile["number"], defaults=defaults
     )
+
+    # Same reasoning as best_move: a search resolves no moves, and must not wipe
+    # the moveset a previous battle lookup stored.
+    if candidates:
+        species.candidate_moves.set(candidates)
+
     return species
 
 
@@ -83,6 +129,8 @@ def index(request):
     form = PokemonSearchForm(request.GET or None)
     profile = None
     just_saved = False
+    species_details = None
+    defensive = None
 
     if form.is_valid():
         name = form.cleaned_data["pokemon"]
@@ -97,17 +145,31 @@ def index(request):
             return _upstream_error(request)
 
         species = sync_species(profile)
+        species_details = _species_details(profile["number"])
+        # Free: the type chart is local data, so this costs no request at all.
+        defensive = defensive_profile(profile["types"])
 
         if request.user.is_authenticated:
             _, just_saved = SavedPokemon.objects.get_or_create(
                 user=request.user, species=species
             )
 
-    return render(
-        request,
-        "main/index.html",
-        {"form": form, "profile": profile, "just_saved": just_saved},
-    )
+    context = {
+        "form": form,
+        "profile": profile,
+        "just_saved": just_saved,
+        "shiny": _wants_shiny(request),
+        "species": species_details,
+        "defensive": defensive,
+    }
+
+    # app.js asks for just the result so a search can swap in place. Same view,
+    # same context, same fragment the full page includes -- only the wrapper
+    # differs, so the two can never disagree.
+    if request.GET.get("partial") == "1" and profile:
+        return render(request, "main/_pokemon_detail.html", context)
+
+    return render(request, "main/index.html", context)
 
 
 @require_GET
@@ -224,6 +286,7 @@ def my_pokemon(request):
             "owned_types": owned_types,
             "active_type": type_filter,
             "active_sort": sort,
+            "shiny": _wants_shiny(request),
         },
     )
 
@@ -241,7 +304,36 @@ def delete_saved_pokemon(request, pk):
 @login_required
 @require_GET
 def battle_view(request):
-    return render(request, "main/battle.html", {"form": BattleForm()})
+    """The matchup form, optionally pre-filled from `?first=` and `?second=`.
+
+    Lets a Pokedex entry link straight into a battle rather than making you
+    retype a name you are already looking at.
+    """
+    initial = {
+        key: value
+        for key, value in (
+            ("pokemon1", request.GET.get("first", "").strip()),
+            ("pokemon2", request.GET.get("second", "").strip()),
+        )
+        if value
+    }
+
+    # Slug for the link, name for the label: the form normalises either way,
+    # but a URL carrying "Mr. Mime" instead of "mr-mime" reads like a bug.
+    saved = list(
+        SavedPokemon.objects.filter(user=request.user)
+        .order_by("species__number")
+        .values("species__name", "species__slug")
+    )
+    quick_picks = [
+        {"name": row["species__name"], "slug": row["species__slug"]} for row in saved
+    ]
+
+    return render(
+        request,
+        "main/battle.html",
+        {"form": BattleForm(initial=initial), "quick_picks": quick_picks},
+    )
 
 
 @login_required
@@ -287,8 +379,10 @@ def battle_result(request):
         species_1=species_1,
         species_2=species_2,
         winner=winner_species,
-        score_1=outcome.first.total,
-        score_2=outcome.second.total,
+        score_1=outcome.first.attack.damage,
+        score_2=outcome.second.attack.damage,
+        turns_1=outcome.first.turns_to_ko,
+        turns_2=outcome.second.turns_to_ko,
     )
 
     return render(
@@ -297,6 +391,10 @@ def battle_result(request):
         {
             "outcome": outcome,
             "stat_rows": battle_service.stat_comparison(first, second),
+            # For the rematch and swap-sides buttons. The slugs, not the raw
+            # input, so a rematch of "25" replays as "pikachu".
+            "first_slug": first["slug"],
+            "second_slug": second["slug"],
         },
     )
 

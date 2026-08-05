@@ -112,6 +112,39 @@ def effectiveness(attacking_type: str, defending_types) -> float:
     return multiplier
 
 
+def defensive_profile(defending_types) -> dict[str, list[dict]]:
+    """How every attacking type fares against this defender.
+
+    The mirror of ``effectiveness``: that answers "what does my move do to
+    them", this answers "what should they fear". Neutral matchups are omitted --
+    listing a dozen 1x rows tells the reader nothing.
+
+    Each bucket is ordered worst-first for the defender, so the most urgent
+    information comes first.
+    """
+    weaknesses, resistances, immunities = [], [], []
+
+    for attacking in TYPES:
+        multiplier = effectiveness(attacking, defending_types)
+        entry = {"type": attacking, "multiplier": multiplier}
+        if multiplier == 0:
+            immunities.append(entry)
+        elif multiplier > 1:
+            weaknesses.append(entry)
+        elif multiplier < 1:
+            resistances.append(entry)
+
+    weaknesses.sort(key=lambda entry: (-entry["multiplier"], entry["type"]))
+    resistances.sort(key=lambda entry: (entry["multiplier"], entry["type"]))
+    immunities.sort(key=lambda entry: entry["type"])
+
+    return {
+        "weaknesses": weaknesses,
+        "resistances": resistances,
+        "immunities": immunities,
+    }
+
+
 def describe(multiplier: float) -> str:
     """Human-readable label for a multiplier, for display next to the number."""
     if multiplier == 0:

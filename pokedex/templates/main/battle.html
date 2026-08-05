@@ -5,8 +5,10 @@
 {% block content %}
     <h1>Pokemon Battle</h1>
     <p class="lede">
-        Two Pokemon, compared on base stats and on how well each one's strongest
-        move lands against the other's typing.
+        A real fight at level 50. Each Pokemon picks its best move <em>against
+        the other</em>, damage runs through the standard formula, and whoever
+        knocks the other out first wins &mdash; so Speed, HP and the right
+        defence all matter.
     </p>
 
     <form method="post" action="{% url 'battle_result' %}" class="card battle-form" data-loading>
@@ -35,4 +37,34 @@
         <button type="submit" class="btn btn--primary">Start Battle</button>
         <p class="hint">Looking up move data takes a moment the first time a Pokemon is battled.</p>
     </form>
+
+    {% if quick_picks %}
+        {% comment %}
+        Your own Pokedex first: these are already stored locally, so battling
+        them needs no cold fetch. The shared autocomplete list covers everything
+        else.
+        {% endcomment %}
+        <section class="card">
+            <h2>From your Pokedex</h2>
+            <p class="hint">
+                {% if form.pokemon1.value %}
+                    Pick an opponent for {{ form.pokemon1.value|title }}.
+                {% else %}
+                    Pick a first contender.
+                {% endif %}
+            </p>
+            <ul class="quick-picks">
+                {% for pick in quick_picks %}
+                    <li>
+                        {% comment %}
+                        Fills whichever slot is still empty, so two clicks set up
+                        a matchup. {% querystring %} keeps the other slot.
+                        {% endcomment %}
+                        <a class="btn btn--ghost"
+                           href="{% if form.pokemon1.value %}{% querystring second=pick.slug %}{% else %}{% querystring first=pick.slug %}{% endif %}">{{ pick.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
 {% endblock %}

@@ -24,28 +24,45 @@
                     <option value="recent"{% if active_sort == 'recent' %} selected{% endif %}>Recently saved</option>
                 </select>
             </div>
+            {% comment %}
+            This form replaces the whole query string on submit, so the shiny
+            state has to ride along or applying a filter would silently drop it.
+            {% endcomment %}
+            {% if shiny %}<input type="hidden" name="shiny" value="1">{% endif %}
             <button type="submit" class="btn">Apply</button>
         </form>
 
-        <p class="result-count">
-            {{ page_obj.paginator.count }} Pokemon saved{% if active_type %}, showing {{ active_type|title }} types{% endif %}.
-        </p>
+        <div class="collection-bar">
+            <p class="result-count">
+                {{ page_obj.paginator.count }} Pokemon saved{% if active_type %}, showing {{ active_type|title }} types{% endif %}.
+            </p>
+            {% include "partials/_shiny_toggle.html" %}
+        </div>
 
         <ul class="pokemon-grid">
             {% for saved in page_obj %}
                 <li class="card pokemon-tile">
-                    {% include "partials/_sprite.html" with sprite=saved.species.sprite name=saved.species.name size=96 %}
+                    {% include "partials/_sprite.html" with sprite=saved.species.sprite sprite_shiny=saved.species.sprite_shiny name=saved.species.name size=96 %}
                     <p class="pokemon-tile__number">#{{ saved.species.number }}</p>
                     <h2 class="pokemon-tile__name">{{ saved.species.name }}</h2>
                     {% include "partials/_types.html" with types=saved.species.types %}
                     <p class="pokemon-tile__total">Base stat total: {{ saved.species.stat_total }}</p>
 
-                    <form method="post" action="{% url 'delete_saved_pokemon' saved.pk %}"
-                          onsubmit="return confirm('Remove {{ saved.species.name|escapejs }} from your Pokedex?');">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <button type="submit" class="btn btn--danger">Remove</button>
-                    </form>
+                    <div class="pokemon-tile__actions">
+                        {% comment %}
+                        Saved species are already local, so a battle started
+                        from here skips the cold move fetch entirely.
+                        {% endcomment %}
+                        <a class="btn btn--ghost"
+                           href="{% url 'battle' %}?first={{ saved.species.slug|urlencode }}">Battle</a>
+
+                        <form method="post" action="{% url 'delete_saved_pokemon' saved.pk %}"
+                              onsubmit="return confirm('Remove {{ saved.species.name|escapejs }} from your Pokedex?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn--danger">Remove</button>
+                        </form>
+                    </div>
                 </li>
             {% endfor %}
         </ul>
