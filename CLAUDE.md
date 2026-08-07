@@ -43,8 +43,8 @@ python manage.py check --deploy --fail-level WARNING
 ## Architecture
 
 A single Django app (`pokedex`) wrapping PokeAPI, with all outbound HTTP isolated in
-`services/pokeapi.py` and all scoring in `services/battle.py`. Views orchestrate; they do not
-fetch or compute.
+`services/pokeapi.py`, all scoring in `services/battle.py` and the played battle in
+`services/interactive.py`. Views orchestrate; they do not fetch or compute.
 
 ### The cost problem that shapes everything
 
@@ -105,6 +105,55 @@ Four things are intentional and easy to regress:
 - **`BattleOutcome` exposes explicit `first_won` / `second_won`.** Templates must not identify the
   winner by comparing names — that broke for two Pokemon sharing a name. `Turn.attacker_is_first`
   exists for the same reason.
+
+### Interactive battle
+
+`services/interactive.py` is the same fight with the player choosing the move (`/battle/play/`).
+It is a separate module and a separate model (`BattleGame`, not `Battle`) because it rolls and the
+simulation does not — `Battle.score_*` mean "damage per turn" and are not comparable to a played
+game.
+
+It builds on `battle.py` without changing it, by consuming `Attack.hit_damage` — the clean hit,
+before the reliability discount — and applying accuracy, crit and the 85–100% roll on top.
+
+- **`reliability` still governs move *selection*, on both sides.** `candidate_moveset` and
+  `choose_move` are untouched; only turn resolution rolls. Replacing expected damage with a roll in
+  the selection path breaks the pruning argument above and changes every stored battle score.
+- **Rolls key off the decision, not the clock.** `rng_for(seed, turn, actor, move_name)` means
+  resubmitting the same move on the same turn always lands identically, so a refresh cannot
+  re-roll. It seeds `random.Random` with a *string*, which hashes via SHA-512 — never `hash()`,
+  which is salted per process and would make every seeded test unreproducible.
+- **The turn guard is the other half of that.** The move form carries `game.turn_number` and
+  `play_move` refuses a POST that disagrees. Seeding alone does not stop going Back and trying each
+  move in turn, because a different move is legitimately a different roll. Views are Post/Redirect/Get.
+- **A played turn issues no HTTP.** `Move` mirrors the full move dict (including `accuracy`,
+  `turn_cost`, `self_ko`), so `species_to_profile` + `Move.as_dict` rebuild everything a turn needs
+  from the database. Only `play_start` fetches. Keep it that way — a per-turn profile fetch would
+  reintroduce the 100–250 request fan-out the moment the profile cache expired.
+- **Turn order comes from `outspeeds`,** shared with the simulation, so both agree on who acts first.
+
+`Turn` gained `missed` / `crit` / `stalled`, all defaulted false, so `partials/_battle_log.html`
+renders a simulated and a played battle through one template.
+
+#### The move draft
+
+`play_draft` sits between picking the Pokemon and starting the fight: it shows the whole candidate
+set (10–20 moves), sorted by effectiveness against the actual opponent, with the automatic four
+pre-ticked. **Accepting the default must reproduce `player_moveset` exactly** — otherwise the
+screen is a chore rather than a refinement.
+
+- **The draft is optional, and the fallback is load-bearing.** `_drafted_moves` returns `None` when
+  no `move` was posted, and `play_start` falls through to `_auto_moveset`. That is the path taken by
+  "Play it out" on a simulation result and by a rematch — both post slugs and nothing else.
+- **Movesets are pinned to the `BattleGame`, not derived per request.** A drafted set is not
+  recoverable any other way, and pinning the opponent's too means a finished battle still reads as
+  it was played if the candidate set is later rebuilt. `_game_moveset` falls back to the automatic
+  pick for rows with nothing pinned, so a game can never load with no moves.
+- **An unrecognised move name is an error, not a silent drop.** Dropping it would let a tampered
+  form play a different battle from the one the page offered.
+- **`_species_for_play` treats "has stored candidate moves" as the readiness test,** not "the row
+  exists" — a plain search creates a species with no moves at all. That is what lets `play_start`
+  skip PokeAPI entirely after the draft screen has already fetched.
 
 ### Cache versioning
 

@@ -248,6 +248,14 @@ class Turn:
     remaining_hp: int
     max_hp: int
     fainted: bool
+    # Only an interactive game rolls, so these stay false for the deterministic
+    # simulation. Defaulted so the one construction below, and every test that
+    # asserts on it, is untouched -- and so `partials/_battle_log.html` renders
+    # a played turn and a simulated one through the same code.
+    missed: bool = False
+    crit: bool = False
+    # Set when the attacker could not act at all (charging or recharging).
+    stalled: bool = False
 
     @property
     def effectiveness_label(self) -> str:
@@ -316,13 +324,24 @@ def stat_score(profile: dict) -> int:
     return sum(int(stats.get(key, 0)) for key in STAT_ORDER)
 
 
-def _strikes_first(first: Contender, second: Contender) -> bool:
-    """Whether `first` acts first. Speed, then bulk, then declaration order."""
-    if first.speed != second.speed:
-        return first.speed > second.speed
-    if first.stat_total != second.stat_total:
-        return first.stat_total > second.stat_total
+def outspeeds(speed: int, total: int, other_speed: int, other_total: int) -> bool:
+    """Whether a side acts first. Speed, then bulk, then declaration order.
+
+    Spelled out separately from `_strikes_first` so the interactive battle can
+    order its turns by exactly this rule rather than a copy of it -- a played
+    game that resolved turns in a different order from the simulation of the
+    same matchup would be a confusing bug to chase.
+    """
+    if speed != other_speed:
+        return speed > other_speed
+    if total != other_total:
+        return total > other_total
     return True
+
+
+def _strikes_first(first: Contender, second: Contender) -> bool:
+    """Whether `first` acts first."""
+    return outspeeds(first.speed, first.stat_total, second.speed, second.stat_total)
 
 
 def simulate(first: Contender, second: Contender) -> list[Turn]:

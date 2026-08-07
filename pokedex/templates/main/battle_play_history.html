@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Games Played{% endblock %}
+
+{% block content %}
+    <h1>Games Played</h1>
+
+    {% if page_obj.paginator.count %}
+        <table class="history-table">
+            <caption class="visually-hidden">Battles you have played, most recent first</caption>
+            <thead>
+                <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Matchup</th>
+                    <th scope="col">Turns</th>
+                    <th scope="col">HP left</th>
+                    <th scope="col">Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for game in page_obj %}
+                    <tr>
+                        <td><time datetime="{{ game.created_at|date:'c' }}">{{ game.created_at|date:"j M Y, H:i" }}</time></td>
+                        <td>
+                            <a href="{% url 'play' pk=game.pk %}">
+                                {{ game.player_species.name }} vs {{ game.opponent_species.name }}
+                            </a>
+                        </td>
+                        <td>{{ game.turn_number }}</td>
+                        <td>{{ game.player_hp }}&ndash;{{ game.opponent_hp }}</td>
+                        <td>
+                            {% if game.result == 'won' %}
+                                <span class="badge badge--saved">Won</span>
+                            {% elif game.result == 'lost' %}
+                                <span class="badge badge--lost">Lost</span>
+                            {% elif game.result == 'forfeit' %}
+                                <span class="badge">Forfeited</span>
+                            {% elif game.result == 'tie' %}
+                                <span class="badge">Draw</span>
+                            {% else %}
+                                <a href="{% url 'play' pk=game.pk %}" class="badge badge--live">Resume</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% include "partials/_pagination.html" %}
+    {% else %}
+        <p class="empty">
+            No games yet. <a href="{% url 'play_setup' %}">Play one</a>.
+        </p>
+    {% endif %}
+{% endblock %}

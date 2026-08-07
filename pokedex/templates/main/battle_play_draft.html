@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Choose Moves{% endblock %}
+
+{% block content %}
+    <h1>Choose {{ player.name }}'s moves</h1>
+    <p class="lede">
+        Pick up to {{ slots }} of the {{ options|length }} move{{ options|length|pluralize }}
+        {{ player.name }} can learn. They are sorted by how well they land on
+        {{ opponent.name }}, and the strongest {{ slots }} are already ticked
+        &mdash; change nothing and you get the same set the game would have
+        picked for you.
+    </p>
+
+    <section class="card draft-opponent">
+        <h2>What you are up against</h2>
+        <div class="draft-opponent__body">
+            {% include "partials/_sprite.html" with sprite=opponent.sprite sprite_shiny=opponent.sprite_shiny name=opponent.name size=96 %}
+            <div>
+                <h3>{{ opponent.name }}</h3>
+                {% include "partials/_types.html" with types=opponent.types %}
+                <p class="hint">
+                    {% comment %}
+                    Its moveset is shown because hiding it would make drafting
+                    guesswork rather than a decision -- and the simulator on the
+                    next page over already tells you everything anyway.
+                    {% endcomment %}
+                    It will attack with:
+                    {% for move in opponent_moves %}
+                        {{ move.display_name }}{% if not forloop.last %}, {% endif %}
+                    {% empty %}
+                        nothing at all.
+                    {% endfor %}
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <form method="post" action="{% url 'play_start' %}" class="card" data-loading>
+        {% csrf_token %}
+        {% comment %}
+        Slugs rather than whatever was typed, so a draft of "25" starts a battle
+        that reads as Pikachu.
+        {% endcomment %}
+        <input type="hidden" name="pokemon1" value="{{ player.slug }}">
+        <input type="hidden" name="pokemon2" value="{{ opponent.slug }}">
+
+        <fieldset class="draft">
+            <legend class="visually-hidden">Moves for {{ player.name }}</legend>
+
+            {% if options %}
+                <ul class="draft-list" data-draft-limit="{{ slots }}">
+                    {% for option in options %}
+                        <li>
+                            <label class="draft-option draft-option--{{ option.move.type }}">
+                                <input type="checkbox" name="move" value="{{ option.move.name }}"
+                                       {% if option.selected %}checked{% endif %}>
+                                <span class="draft-option__body">
+                                    <span class="draft-option__name">{{ option.move.display_name }}</span>
+                                    <span class="draft-option__meta">
+                                        <span class="type type--{{ option.move.type }}">{{ option.move.type|title }}</span>
+                                        <span class="draft-option__stat">{{ option.move.power }} power</span>
+                                        <span class="draft-option__stat">{{ option.move.accuracy }}% acc</span>
+                                        <span class="draft-option__stat">{{ option.move.damage_class|title }}</span>
+                                    </span>
+                                    <span class="draft-option__tags">
+                                        {% if option.multiplier != 1 %}
+                                            <span class="matchup matchup--{% if option.multiplier > 1 %}good{% else %}bad{% endif %}">
+                                                {{ option.label }}
+                                            </span>
+                                        {% endif %}
+                                        {% if option.stab %}<span class="badge">STAB</span>{% endif %}
+                                        {% if option.move.turn_cost > 1 %}<span class="badge">Costs a turn</span>{% endif %}
+                                    </span>
+                                </span>
+                            </label>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty">
+                    {{ player.name }} has no damaging moves, so there is nothing
+                    to choose. It will not be able to attack.
+                </p>
+            {% endif %}
+        </fieldset>
+
+        <p class="hint" data-draft-count>Pick at most {{ slots }}.</p>
+
+        <button type="submit" class="btn btn--primary" data-loading-text="Starting...">Start Battle</button>
+    </form>
+
+    <div class="actions">
+        <a href="{% url 'play_setup' %}" class="btn btn--ghost">Change Pokemon</a>
+    </div>
+{% endblock %}

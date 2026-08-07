@@ -27,7 +27,7 @@
         {% include "partials/_contender.html" with contender=outcome.second won=outcome.second_won %}
     </div>
 
-    {% include "partials/_battle_log.html" %}
+    {% include "partials/_battle_log.html" with turns=outcome.turns stalemate=outcome.stalemate %}
 
     <section class="card">
         <h2>Base stats, side by side</h2>
@@ -78,6 +78,17 @@
             <input type="hidden" name="pokemon1" value="{{ second_slug }}">
             <input type="hidden" name="pokemon2" value="{{ first_slug }}">
             <button type="submit" class="btn" data-loading-text="Swapping...">Swap sides</button>
+        </form>
+
+        {% comment %}
+        The simulation says who would win. This is the invitation to disagree
+        with it -- same two Pokemon, but the moves are yours to pick.
+        {% endcomment %}
+        <form method="post" action="{% url 'play_start' %}" data-loading>
+            {% csrf_token %}
+            <input type="hidden" name="pokemon1" value="{{ first_slug }}">
+            <input type="hidden" name="pokemon2" value="{{ second_slug }}">
+            <button type="submit" class="btn" data-loading-text="Setting up...">Play it out</button>
         </form>
 
         <a href="{% url 'battle' %}" class="btn btn--ghost">New matchup</a>

@@ -1,0 +1,59 @@
+{% comment %}
+The four move buttons.
+
+Expects `game` and `move_cards` (from views._move_cards): each card carries the
+move, its multiplier against the current opponent, and whether it gets STAB.
+
+One form with several submit buttons, so the clicked button's name/value is what
+gets posted. That needs no JavaScript at all.
+
+The hidden `turn` is the anti-replay guard: play_move refuses a POST whose turn
+does not match the game's. It is what stops someone going Back and trying each
+move until one crits.
+{% endcomment %}
+<section class="card move-picker">
+    <h2>Your move</h2>
+
+    {% if move_cards %}
+        <form method="post" action="{% url 'play_move' pk=game.pk %}" class="move-grid" data-loading>
+            {% csrf_token %}
+            <input type="hidden" name="turn" value="{{ game.turn_number }}">
+
+            {% for card in move_cards %}
+                <button type="submit" name="move" value="{{ card.move.name }}"
+                        class="move-card move-card--{{ card.move.type }}"
+                        data-loading-text="Attacking...">
+                    <span class="move-card__name">{{ card.move.display_name }}</span>
+                    <span class="move-card__meta">
+                        <span class="type type--{{ card.move.type }}">{{ card.move.type|title }}</span>
+                        <span class="move-card__stat">{{ card.move.power }} power</span>
+                        <span class="move-card__stat">{{ card.move.accuracy }}% acc</span>
+                    </span>
+                    <span class="move-card__tags">
+                        {% if card.multiplier != 1 %}
+                            <span class="matchup matchup--{% if card.multiplier > 1 %}good{% else %}bad{% endif %}">
+                                {{ card.label }}
+                            </span>
+                        {% endif %}
+                        {% if card.stab %}<span class="badge">STAB</span>{% endif %}
+                        {% if card.move.turn_cost > 1 %}<span class="badge">Costs a turn</span>{% endif %}
+                    </span>
+                </button>
+            {% endfor %}
+        </form>
+    {% else %}
+        <p class="empty">
+            {{ state.player.name }} has no damaging move it can use, so it can
+            only stand there.
+        </p>
+    {% endif %}
+
+    {% if game.player_recharging %}
+        <p class="hint">{{ state.player.name }} has to recharge this turn.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'play_forfeit' pk=game.pk %}" class="move-picker__forfeit">
+        {% csrf_token %}
+        <button type="submit" class="btn btn--ghost">Forfeit</button>
+    </form>
+</section>
