@@ -1,37 +1,57 @@
 {% comment %}
-The blow-by-blow. Expects `outcome` (a services.battle.BattleOutcome).
+The blow-by-blow. Shared by the deterministic simulation and the played battle,
+which is the point: a turn is a turn, and there should not be two places that
+decide how one is described.
+
+Expects `turns` (a list of services.battle.Turn) and optionally `stalemate` and
+`log_title`.
+
+`missed`, `crit` and `stalled` are always false for a simulated battle -- only a
+played one rolls -- so the simulation renders exactly as it did before.
 
 Rendered as an ordered list rather than a table: it is a sequence of events, and
 each entry is one sentence plus a bar, not a row of comparable columns.
 {% endcomment %}
 <section class="card battle-log">
-    <h2>How it played out</h2>
+    <h2>{{ log_title|default:"How it played out" }}</h2>
 
-    {% if outcome.stalemate %}
+    {% if stalemate %}
         <p class="empty">
             Neither Pokemon can damage the other, so the fight never starts.
         </p>
     {% else %}
         <ol class="battle-log__turns">
-            {% for turn in outcome.turns %}
+            {% for turn in turns %}
                 <li class="battle-log__turn {% if turn.attacker_is_first %}battle-log__turn--first{% else %}battle-log__turn--second{% endif %}">
                     <p class="battle-log__action">
                         <strong>{{ turn.attacker_name }}</strong>
-                        {% if turn.move %}
-                            used {{ turn.move.display_name }}
-                        {% else %}
+                        {% if turn.stalled %}
+                            has to recharge
+                        {% elif not turn.move %}
                             has no damaging move
+                        {% elif turn.missed %}
+                            used {{ turn.move.display_name }} &mdash; and missed
+                        {% else %}
+                            used {{ turn.move.display_name }}
                         {% endif %}
-                        {% if turn.multiplier != 1 %}
-                            <span class="matchup matchup--{% if turn.multiplier > 1 %}good{% else %}bad{% endif %}">
-                                {{ turn.effectiveness_label }}
-                            </span>
+
+                        {% if not turn.missed and not turn.stalled %}
+                            {% if turn.multiplier != 1 %}
+                                <span class="matchup matchup--{% if turn.multiplier > 1 %}good{% else %}bad{% endif %}">
+                                    {{ turn.effectiveness_label }}
+                                </span>
+                            {% endif %}
+                            {% if turn.stab %}<span class="badge">STAB</span>{% endif %}
+                            {% if turn.crit %}<span class="badge badge--crit">Critical hit</span>{% endif %}
                         {% endif %}
-                        {% if turn.stab %}<span class="badge">STAB</span>{% endif %}
                     </p>
 
                     <p class="battle-log__damage">
-                        {{ turn.damage }} damage &mdash;
+                        {% if turn.stalled or turn.missed %}
+                            No damage &mdash;
+                        {% else %}
+                            {{ turn.damage }} damage &mdash;
+                        {% endif %}
                         {{ turn.defender_name }} on {{ turn.remaining_hp }}/{{ turn.max_hp }} HP
                     </p>
 

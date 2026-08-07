@@ -240,9 +240,54 @@
         });
     }
 
+    /**
+     * Show the move draft going over its limit before the form is submitted.
+     *
+     * Enhancement only: the server validates the count regardless, and without
+     * this file the page still works -- you just find out after the round trip.
+     * Nothing is disabled, because disabling a checkbox you have already ticked
+     * is a good way to trap someone who wants to change their mind.
+     */
+    function wireDraftLimit() {
+        var list = document.querySelector("[data-draft-limit]");
+        if (!list) {
+            return;
+        }
+
+        var limit = parseInt(list.dataset.draftLimit, 10);
+        var counter = document.querySelector("[data-draft-count]");
+
+        function update() {
+            var boxes = Array.prototype.slice.call(
+                list.querySelectorAll("input[type=checkbox]")
+            );
+            var checked = boxes.filter(function (box) { return box.checked; });
+            var over = checked.length > limit;
+
+            boxes.forEach(function (box) {
+                var option = box.closest(".draft-option");
+                if (option) {
+                    option.classList.toggle("is-over-limit", over && box.checked);
+                }
+            });
+
+            if (counter) {
+                counter.textContent = over
+                    ? checked.length + " selected — pick at most " + limit + "."
+                    : checked.length + " of " + limit + " selected.";
+            }
+        }
+
+        // Delegated at the list rather than bound per checkbox, in keeping with
+        // the rest of this file.
+        list.addEventListener("change", update);
+        update();
+    }
+
     wireLoadingStates();
     wireAutocomplete();
     wireSpriteFallbacks();
     wireShinyToggle();
     wireLiveSearch();
+    wireDraftLimit();
 })();

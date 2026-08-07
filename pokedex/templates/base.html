@@ -20,6 +20,12 @@
         <a href="{% url 'index' %}"{% if request.resolver_match.url_name == 'index' %} aria-current="page"{% endif %}>Search</a>
         <a href="{% url 'battle' %}"{% if request.resolver_match.url_name == 'battle' %} aria-current="page"{% endif %}>Battle</a>
         {% if user.is_authenticated %}
+            {% comment %}
+            Every interactive-battle route is named play*, and nothing else is,
+            so a substring test marks the whole section current. default:"" keeps
+            it safe on an error page, where there is no resolver match at all.
+            {% endcomment %}
+            <a href="{% url 'play_setup' %}"{% if 'play' in request.resolver_match.url_name|default:"" %} aria-current="page"{% endif %}>Play</a>
             <a href="{% url 'my_pokemon' %}"{% if request.resolver_match.url_name == 'my_pokemon' %} aria-current="page"{% endif %}>My Pokemon</a>
             <a href="{% url 'battle_history' %}"{% if request.resolver_match.url_name == 'battle_history' %} aria-current="page"{% endif %}>History</a>
         {% endif %}

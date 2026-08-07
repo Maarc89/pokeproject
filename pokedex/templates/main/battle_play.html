@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}{{ state.player.name }} vs {{ state.opponent.name }}{% endblock %}
+
+{% block content %}
+    <h1>{{ state.player.name }} vs {{ state.opponent.name }}</h1>
+
+    {% if game.is_finished %}
+        <div class="verdict{% if game.result == 'tie' %} verdict--tie{% endif %}">
+            {% if game.result == 'won' %}
+                <h2>You win</h2>
+                <p>
+                    {{ state.player.name }} knocked out {{ state.opponent.name }}
+                    with {{ game.player_hp }} HP to spare.
+                </p>
+            {% elif game.result == 'lost' %}
+                <h2>You lose</h2>
+                <p>
+                    {{ state.opponent.name }} knocked out {{ state.player.name }}.
+                    It still had {{ game.opponent_hp }} HP left.
+                </p>
+            {% elif game.result == 'forfeit' %}
+                <h2>Forfeited</h2>
+                <p>You walked away on turn {{ game.turn_number }}.</p>
+            {% else %}
+                <h2>It's a draw</h2>
+                <p>Neither Pokemon could finish the other off.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% include "partials/_arena.html" %}
+
+    {% if not game.is_finished %}
+        {% include "partials/_move_picker.html" %}
+    {% endif %}
+
+    {% if turns %}
+        {% include "partials/_battle_log.html" with log_title="Blow by blow" %}
+    {% endif %}
+
+    <div class="actions">
+        {% comment %}
+        A rematch is a fresh game rather than a reset of this one, so the old
+        battle stays readable in the history and the new one gets its own seed.
+        It carries the moveset forward: having drafted a set, being silently
+        handed the automatic four on the rematch would be a nasty surprise.
+        {% endcomment %}
+        {% if game.is_finished %}
+            <form method="post" action="{% url 'play_start' %}" data-loading>
+                {% csrf_token %}
+                <input type="hidden" name="pokemon1" value="{{ game.player_species.slug }}">
+                <input type="hidden" name="pokemon2" value="{{ game.opponent_species.slug }}">
+                {% for move in state.player.moves %}
+                    <input type="hidden" name="move" value="{{ move.name }}">
+                {% endfor %}
+                <button type="submit" class="btn btn--primary" data-loading-text="Rematching...">Rematch</button>
+            </form>
+
+            {% comment %}
+            No moves carried here: the sides swap, so the drafted set belongs to
+            the wrong Pokemon. The draft screen is the right place to pick again.
+            {% endcomment %}
+            <form method="post" action="{% url 'play_draft' %}" data-loading>
+                {% csrf_token %}
+                <input type="hidden" name="pokemon1" value="{{ game.opponent_species.slug }}">
+                <input type="hidden" name="pokemon2" value="{{ game.player_species.slug }}">
+                <button type="submit" class="btn" data-loading-text="Swapping...">Play the other side</button>
+            </form>
+
+            <form method="post" action="{% url 'play_draft' %}" data-loading>
+                {% csrf_token %}
+                <input type="hidden" name="pokemon1" value="{{ game.player_species.slug }}">
+                <input type="hidden" name="pokemon2" value="{{ game.opponent_species.slug }}">
+                <button type="submit" class="btn" data-loading-text="Loading...">Rematch, new moves</button>
+            </form>
+        {% endif %}
+
+        <a href="{% url 'play_setup' %}" class="btn btn--ghost">New battle</a>
+        <a href="{% url 'play_history' %}" class="btn btn--ghost">Past games</a>
+        <a href="{% url 'battle' %}?first={{ game.player_species.slug }}&amp;second={{ game.opponent_species.slug }}"
+           class="btn btn--ghost">See the simulation</a>
+    </div>
+{% endblock %}

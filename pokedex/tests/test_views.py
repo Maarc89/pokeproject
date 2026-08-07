@@ -1,10 +1,12 @@
+import re
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from ..models import Battle, PokemonSpecies, SavedPokemon
+from ..models import Battle, BattleGame, PokemonSpecies, SavedPokemon
+from ..services import interactive
 from ..services.pokeapi import PokeAPIUnavailable, PokemonNotFound
 from .factories import move, profile
 
@@ -568,6 +570,521 @@ class BattleHistoryTests(TestCase):
         self.client.login(username="ash", password=PASSWORD)
         response = self.client.get(reverse("battle_history"))
         self.assertContains(response, "No battles yet")
+
+
+class PlayTests(TestCase):
+    """The interactive battle.
+
+    The turn guard and Post/Redirect/Get are what make a played battle honest,
+    so most of these are about what happens when a request arrives twice or out
+    of order rather than about the fight itself.
+    """
+
+    def setUp(self):
+        User.objects.create_user("ash", password=PASSWORD)
+        self.client.login(username="ash", password=PASSWORD)
+
+    def contenders(self):
+        return [
+            profile(number=6, name="Charizard", slug="charizard", types=("fire", "flying"),
+                    moves=[move("flamethrower", power=90, type="fire"),
+                           move("wing-attack", power=60, type="flying",
+                                damage_class="physical")]),
+            profile(number=9, name="Blastoise", slug="blastoise", types=("water",),
+                    moves=[move("surf", power=90, type="water")]),
+        ]
+
+    def start(self, fetch):
+        fetch.side_effect = self.contenders()
+        self.client.post(
+            reverse("play_start"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+        return BattleGame.objects.get()
+
+    def test_setup_requires_login(self):
+        self.client.logout()
+        response = self.client.get(reverse("play_setup"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_starting_a_game_redirects_to_the_arena(self, fetch):
+        fetch.side_effect = self.contenders()
+
+        response = self.client.post(
+            reverse("play_start"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+
+        game = BattleGame.objects.get()
+        self.assertRedirects(response, reverse("play", kwargs={"pk": game.pk}))
+        self.assertEqual(game.turn_number, 0)
+        self.assertEqual(game.player_hp, game.player_max_hp)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_starting_a_game_requests_move_data(self, fetch):
+        fetch.side_effect = self.contenders()
+
+        self.client.post(
+            reverse("play_start"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+
+        for call in fetch.call_args_list:
+            self.assertTrue(call.kwargs.get("include_moves"))
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_playing_a_turn_needs_no_further_api_calls(self, fetch):
+        """The whole point of storing accuracy and turn cost on Move: after
+        set-up the battle runs entirely on local data."""
+        game = self.start(fetch)
+        fetch.reset_mock()
+        fetch.side_effect = None
+
+        self.client.get(reverse("play", kwargs={"pk": game.pk}))
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "flamethrower", "turn": game.turn_number},
+        )
+
+        fetch.assert_not_called()
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_arena_offers_the_stored_moves(self, fetch):
+        game = self.start(fetch)
+
+        response = self.client.get(reverse("play", kwargs={"pk": game.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Flamethrower")
+        self.assertContains(response, "Wing Attack")
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_move_advances_the_turn_and_redirects(self, fetch):
+        game = self.start(fetch)
+
+        response = self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "flamethrower", "turn": 0},
+        )
+
+        self.assertRedirects(response, reverse("play", kwargs={"pk": game.pk}))
+        game.refresh_from_db()
+        self.assertEqual(game.turn_number, 1)
+        self.assertTrue(game.log)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_stale_turn_is_refused(self, fetch):
+        """Regression guard for save-scumming: without this, going Back and
+        submitting a different move lets a player retry until one crits."""
+        game = self.start(fetch)
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "flamethrower", "turn": 0},
+        )
+        game.refresh_from_db()
+        before = (game.turn_number, game.player_hp, game.opponent_hp, len(game.log))
+
+        # Exactly what a resubmitted form from the previous page would send.
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "wing-attack", "turn": 0},
+        )
+
+        game.refresh_from_db()
+        self.assertEqual(
+            (game.turn_number, game.player_hp, game.opponent_hp, len(game.log)), before
+        )
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_missing_turn_is_refused(self, fetch):
+        game = self.start(fetch)
+
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}), {"move": "flamethrower"}
+        )
+
+        game.refresh_from_db()
+        self.assertEqual(game.turn_number, 0)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_refreshing_the_arena_does_not_advance_anything(self, fetch):
+        game = self.start(fetch)
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "flamethrower", "turn": 0},
+        )
+        game.refresh_from_db()
+        before = (game.turn_number, game.player_hp, game.opponent_hp)
+
+        for _ in range(3):
+            self.client.get(reverse("play", kwargs={"pk": game.pk}))
+
+        game.refresh_from_db()
+        self.assertEqual((game.turn_number, game.player_hp, game.opponent_hp), before)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_replaying_the_same_turn_rolls_the_same(self, fetch):
+        """Two games on the same seed and the same move must land identically,
+        which is what makes a refusal safe to redirect rather than error."""
+        game = self.start(fetch)
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "flamethrower", "turn": 0},
+        )
+        game.refresh_from_db()
+        first = game.opponent_hp
+
+        rerun = BattleGame.objects.create(
+            user=game.user,
+            player_species=game.player_species,
+            opponent_species=game.opponent_species,
+            seed=game.seed,
+            player_hp=game.player_max_hp,
+            opponent_hp=game.opponent_max_hp,
+            player_max_hp=game.player_max_hp,
+            opponent_max_hp=game.opponent_max_hp,
+        )
+        self.client.post(
+            reverse("play_move", kwargs={"pk": rerun.pk}),
+            {"move": "flamethrower", "turn": 0},
+        )
+        rerun.refresh_from_db()
+
+        self.assertEqual(rerun.opponent_hp, first)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_move_the_pokemon_does_not_have_is_refused(self, fetch):
+        game = self.start(fetch)
+
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "hyper-beam", "turn": 0},
+        )
+
+        game.refresh_from_db()
+        self.assertEqual(game.turn_number, 0)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_finished_game_refuses_further_moves(self, fetch):
+        game = self.start(fetch)
+        game.result = BattleGame.FORFEIT
+        game.save(update_fields=["result"])
+
+        self.client.post(
+            reverse("play_move", kwargs={"pk": game.pk}),
+            {"move": "flamethrower", "turn": 0},
+        )
+
+        game.refresh_from_db()
+        self.assertEqual(game.turn_number, 0)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_forfeiting_ends_the_game(self, fetch):
+        game = self.start(fetch)
+
+        self.client.post(reverse("play_forfeit", kwargs={"pk": game.pk}))
+
+        game.refresh_from_db()
+        self.assertEqual(game.result, BattleGame.FORFEIT)
+        self.assertIsNotNone(game.finished_at)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_another_users_game_is_not_reachable(self, fetch):
+        game = self.start(fetch)
+        User.objects.create_user("misty", password=PASSWORD)
+        self.client.login(username="misty", password=PASSWORD)
+
+        self.assertEqual(
+            self.client.get(reverse("play", kwargs={"pk": game.pk})).status_code, 404
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("play_move", kwargs={"pk": game.pk}),
+                {"move": "flamethrower", "turn": 0},
+            ).status_code,
+            404,
+        )
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_same_pokemon_by_different_identifiers_is_rejected(self, fetch):
+        fetch.side_effect = [
+            profile(number=25, name="Pikachu"), profile(number=25, name="Pikachu")
+        ]
+
+        response = self.client.post(
+            reverse("play_start"), {"pokemon1": "pikachu", "pokemon2": "25"}
+        )
+
+        self.assertRedirects(response, reverse("play_setup"))
+        self.assertEqual(BattleGame.objects.count(), 0)
+
+    @patch("pokedex.views.fetch_pokemon_profile", side_effect=PokemonNotFound("nope"))
+    def test_unknown_pokemon_returns_404(self, _fetch):
+        response = self.client.post(
+            reverse("play_start"), {"pokemon1": "missingno", "pokemon2": "pikachu"}
+        )
+        self.assertEqual(response.status_code, 404)
+
+    @patch("pokedex.views.fetch_pokemon_profile", side_effect=PokeAPIUnavailable("boom"))
+    def test_upstream_failure_returns_503(self, _fetch):
+        response = self.client.post(
+            reverse("play_start"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+        self.assertEqual(response.status_code, 503)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_playing_to_a_finish_records_a_result(self, fetch):
+        game = self.start(fetch)
+
+        for _ in range(interactive.MAX_ROUNDS):
+            game.refresh_from_db()
+            if game.result:
+                break
+            self.client.post(
+                reverse("play_move", kwargs={"pk": game.pk}),
+                {"move": "flamethrower", "turn": game.turn_number},
+            )
+
+        game.refresh_from_db()
+        self.assertIn(game.result, {"won", "lost", "tie"})
+        self.assertIsNotNone(game.finished_at)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_history_lists_your_games_only(self, fetch):
+        self.start(fetch)
+
+        response = self.client.get(reverse("play_history"))
+        self.assertContains(response, "Charizard")
+
+        User.objects.create_user("misty", password=PASSWORD)
+        self.client.login(username="misty", password=PASSWORD)
+        self.assertContains(self.client.get(reverse("play_history")), "No games yet")
+
+    def test_move_endpoint_rejects_get(self):
+        self.assertEqual(
+            self.client.get(reverse("play_move", kwargs={"pk": 1})).status_code, 405
+        )
+
+
+class PlayDraftTests(TestCase):
+    """Choosing your four moves before the fight.
+
+    The draft is optional by design: every entry point that skips it must still
+    produce a playable game with the automatic four, so a good half of these are
+    about the fallback rather than the drafting.
+    """
+
+    def setUp(self):
+        User.objects.create_user("ash", password=PASSWORD)
+        self.client.login(username="ash", password=PASSWORD)
+
+    def contenders(self):
+        return [
+            profile(number=6, name="Charizard", slug="charizard", types=("fire", "flying"),
+                    moves=[move("flamethrower", power=90, type="fire"),
+                           move("fire-blast", power=110, type="fire"),
+                           move("air-slash", power=75, type="flying"),
+                           move("dragon-claw", power=80, type="dragon",
+                                damage_class="physical"),
+                           move("earthquake", power=100, type="ground",
+                                damage_class="physical"),
+                           move("focus-blast", power=120, type="fighting", accuracy=70)]),
+            profile(number=9, name="Blastoise", slug="blastoise", types=("water",),
+                    moves=[move("surf", power=90, type="water")]),
+        ]
+
+    def draft(self, fetch):
+        fetch.side_effect = self.contenders()
+        return self.client.post(
+            reverse("play_draft"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+
+    def start_with(self, moves):
+        return self.client.post(
+            reverse("play_start"),
+            {"pokemon1": "charizard", "pokemon2": "blastoise", "move": moves},
+        )
+
+    def test_draft_requires_login(self):
+        self.client.logout()
+        response = self.client.post(
+            reverse("play_draft"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_draft_lists_every_candidate_move(self, fetch):
+        response = self.draft(fetch)
+
+        self.assertEqual(response.status_code, 200)
+        for name in ["Flamethrower", "Fire Blast", "Air Slash", "Dragon Claw",
+                     "Earthquake", "Focus Blast"]:
+            self.assertContains(response, name)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_draft_pre_ticks_the_automatic_four(self, fetch):
+        """Accepting the default has to reproduce the old behaviour exactly, or
+        the draft screen is a chore rather than a refinement."""
+        response = self.draft(fetch)
+
+        ticked = re.findall(
+            r'name="move" value="([^"]+)"[^>]*checked', response.content.decode()
+        )
+        species = PokemonSpecies.objects.get(number=6)
+        automatic = [
+            entry["name"]
+            for entry in interactive.player_moveset(
+                [m.as_dict() for m in species.candidate_moves.all()]
+            )
+        ]
+        self.assertEqual(sorted(ticked), sorted(automatic))
+        self.assertEqual(len(ticked), interactive.MOVE_SLOTS)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_draft_shows_what_the_opponent_will_attack_with(self, fetch):
+        response = self.draft(fetch)
+
+        self.assertContains(response, "It will attack with")
+        self.assertContains(response, "Surf")
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_draft_does_not_refetch_when_starting(self, fetch):
+        """The draft screen already paid for the fetch; play_start must not pay
+        again just because it was handed a name instead of a row."""
+        self.draft(fetch)
+        fetch.reset_mock()
+        fetch.side_effect = None
+
+        self.start_with(["earthquake", "air-slash"])
+
+        fetch.assert_not_called()
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_drafted_moves_are_the_ones_stored(self, fetch):
+        self.draft(fetch)
+
+        self.start_with(["earthquake", "air-slash"])
+
+        game = BattleGame.objects.get()
+        self.assertEqual(
+            sorted(game.player_moves.values_list("name", flat=True)),
+            ["air-slash", "earthquake"],
+        )
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_arena_offers_exactly_the_drafted_moves(self, fetch):
+        self.draft(fetch)
+        self.start_with(["earthquake", "air-slash"])
+        game = BattleGame.objects.get()
+
+        response = self.client.get(reverse("play", kwargs={"pk": game.pk}))
+
+        offered = re.findall(r'name="move" value="([^"]+)"', response.content.decode())
+        self.assertEqual(sorted(offered), ["air-slash", "earthquake"])
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_more_than_four_moves_is_refused(self, fetch):
+        self.draft(fetch)
+
+        response = self.start_with([
+            "flamethrower", "fire-blast", "air-slash", "dragon-claw", "earthquake"
+        ])
+
+        self.assertRedirects(response, reverse("play_setup"))
+        self.assertEqual(BattleGame.objects.count(), 0)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_move_the_pokemon_cannot_learn_is_refused(self, fetch):
+        """A tampered form must not quietly play a different battle from the one
+        the page offered."""
+        self.draft(fetch)
+
+        response = self.start_with(["earthquake", "hyper-beam"])
+
+        self.assertRedirects(response, reverse("play_setup"))
+        self.assertEqual(BattleGame.objects.count(), 0)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_starting_without_a_draft_falls_back_to_the_automatic_four(self, fetch):
+        """The path taken by "Play it out" from a simulation and by a rematch."""
+        fetch.side_effect = self.contenders()
+
+        self.client.post(
+            reverse("play_start"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+
+        game = BattleGame.objects.get()
+        self.assertEqual(game.player_moves.count(), interactive.MOVE_SLOTS)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_the_opponent_moveset_is_pinned_too(self, fetch):
+        self.draft(fetch)
+        self.start_with(["earthquake"])
+
+        game = BattleGame.objects.get()
+        self.assertEqual(
+            list(game.opponent_moves.values_list("name", flat=True)), ["surf"]
+        )
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_pinned_moveset_survives_the_candidate_set_being_rebuilt(self, fetch):
+        """The reason the moveset is pinned to the game rather than derived: a
+        finished battle has to keep reading the way it was played."""
+        self.draft(fetch)
+        self.start_with(["earthquake", "air-slash"])
+        game = BattleGame.objects.get()
+
+        game.player_species.candidate_moves.clear()
+
+        response = self.client.get(reverse("play", kwargs={"pk": game.pk}))
+        offered = re.findall(r'name="move" value="([^"]+)"', response.content.decode())
+        self.assertEqual(sorted(offered), ["air-slash", "earthquake"])
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_a_game_with_no_pinned_moveset_still_loads(self, fetch):
+        """Games created before the moveset was pinned fall back to the
+        automatic pick rather than becoming unplayable."""
+        self.draft(fetch)
+        self.start_with(["earthquake"])
+        game = BattleGame.objects.get()
+        game.player_moves.clear()
+        game.opponent_moves.clear()
+
+        response = self.client.get(reverse("play", kwargs={"pk": game.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        offered = re.findall(r'name="move" value="([^"]+)"', response.content.decode())
+        self.assertEqual(len(offered), interactive.MOVE_SLOTS)
+
+    @patch("pokedex.views.fetch_pokemon_profile")
+    def test_same_pokemon_is_rejected_at_the_draft(self, fetch):
+        fetch.side_effect = [
+            profile(number=25, name="Pikachu", moves=[move("thunderbolt")]),
+            profile(number=25, name="Pikachu", moves=[move("thunderbolt")]),
+        ]
+
+        response = self.client.post(
+            reverse("play_draft"), {"pokemon1": "pikachu", "pokemon2": "25"}
+        )
+
+        self.assertRedirects(response, reverse("play_setup"))
+
+    @patch("pokedex.views.fetch_pokemon_profile", side_effect=PokemonNotFound("nope"))
+    def test_unknown_pokemon_returns_404(self, _fetch):
+        response = self.client.post(
+            reverse("play_draft"), {"pokemon1": "missingno", "pokemon2": "pikachu"}
+        )
+        self.assertEqual(response.status_code, 404)
+
+    @patch("pokedex.views.fetch_pokemon_profile", side_effect=PokeAPIUnavailable("boom"))
+    def test_upstream_failure_returns_503(self, _fetch):
+        response = self.client.post(
+            reverse("play_draft"), {"pokemon1": "charizard", "pokemon2": "blastoise"}
+        )
+        self.assertEqual(response.status_code, 503)
+
+    def test_draft_rejects_get(self):
+        self.assertEqual(self.client.get(reverse("play_draft")).status_code, 405)
 
 
 class PokemonNamesApiTests(TestCase):

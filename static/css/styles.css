@@ -845,6 +845,246 @@ code {
 }
 
 .badge--saved { background: var(--success-bg); color: var(--success); }
+.badge--lost { background: var(--danger-bg); color: var(--danger); }
+.badge--crit { background: var(--danger-bg); color: var(--danger); }
+
+.badge--live {
+    background: var(--brand-yellow);
+    /* Fixed dark ink: the yellow is the same in both themes, so a
+       theme-following colour would fail contrast in one of them. */
+    color: #3a2c00;
+    text-decoration: none;
+}
+
+/* ---------- Interactive battle ------------------------------------------ */
+
+.arena {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: start;
+    gap: var(--space-4);
+    margin-block-end: var(--space-5);
+}
+
+.arena__side {
+    padding: var(--space-4);
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+
+/* Which side is yours, without relying on colour alone. */
+.arena__side--player { border-block-start: 4px solid var(--brand-blue); }
+.arena__side--opponent { border-block-start: 4px solid var(--type-fire); }
+
+.arena__side.is-fainted {
+    opacity: 0.55;
+    filter: grayscale(1);
+}
+
+.arena__role {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.arena__name { margin: var(--space-2) 0; }
+
+.arena__hp {
+    margin: var(--space-3) 0 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.arena .types { justify-content: center; }
+
+.arena__versus {
+    align-self: center;
+    margin: 0;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+    .arena { grid-template-columns: 1fr; }
+    .arena__versus { justify-self: center; }
+}
+
+.move-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--space-3);
+}
+
+.move-card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    text-align: start;
+    font: inherit;
+    color: var(--text);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    /* The type stripe is the fastest way to read a moveset's coverage. */
+    border-inline-start: 5px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.move-card:hover { background: var(--surface); border-color: var(--brand-blue); }
+.move-card:active { transform: translateY(1px); }
+
+.move-card:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.move-card[disabled] { opacity: 0.6; cursor: default; }
+
+.move-card__name { font-weight: 700; }
+
+.move-card__meta,
+.move-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.move-card__stat {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* One rule per type rather than eighteen selectors: the custom properties
+   already exist for the .type--* badges. */
+.move-card--normal { border-inline-start-color: var(--type-normal); }
+.move-card--fire { border-inline-start-color: var(--type-fire); }
+.move-card--water { border-inline-start-color: var(--type-water); }
+.move-card--electric { border-inline-start-color: var(--type-electric); }
+.move-card--grass { border-inline-start-color: var(--type-grass); }
+.move-card--ice { border-inline-start-color: var(--type-ice); }
+.move-card--fighting { border-inline-start-color: var(--type-fighting); }
+.move-card--poison { border-inline-start-color: var(--type-poison); }
+.move-card--ground { border-inline-start-color: var(--type-ground); }
+.move-card--flying { border-inline-start-color: var(--type-flying); }
+.move-card--psychic { border-inline-start-color: var(--type-psychic); }
+.move-card--bug { border-inline-start-color: var(--type-bug); }
+.move-card--rock { border-inline-start-color: var(--type-rock); }
+.move-card--ghost { border-inline-start-color: var(--type-ghost); }
+.move-card--dragon { border-inline-start-color: var(--type-dragon); }
+.move-card--dark { border-inline-start-color: var(--type-dark); }
+.move-card--steel { border-inline-start-color: var(--type-steel); }
+.move-card--fairy { border-inline-start-color: var(--type-fairy); }
+
+.move-picker__forfeit { margin-block-start: var(--space-4); }
+
+/* Move draft */
+
+.draft-opponent__body {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.draft-opponent__body h3 { margin: 0 0 var(--space-2); }
+
+.draft {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.draft-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-3);
+}
+
+.draft-option {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-inline-start: 5px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.draft-option:hover { border-color: var(--brand-blue); }
+
+/* :has is what lets the whole card show its state without any JavaScript. */
+.draft-option:has(input:checked) {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+
+.draft-option:has(input:focus-visible) {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* Over the limit: still submittable, still rejected server-side, but flagged
+   before the round trip. Set by app.js; absent without it. */
+.draft-option.is-over-limit {
+    opacity: 0.55;
+    box-shadow: inset 0 0 0 1px var(--danger);
+}
+
+.draft-option input { margin-block-start: 0.25rem; }
+
+.draft-option__body {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.draft-option__name { font-weight: 700; }
+
+.draft-option__meta,
+.draft-option__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.draft-option__stat {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.draft-option--normal { border-inline-start-color: var(--type-normal); }
+.draft-option--fire { border-inline-start-color: var(--type-fire); }
+.draft-option--water { border-inline-start-color: var(--type-water); }
+.draft-option--electric { border-inline-start-color: var(--type-electric); }
+.draft-option--grass { border-inline-start-color: var(--type-grass); }
+.draft-option--ice { border-inline-start-color: var(--type-ice); }
+.draft-option--fighting { border-inline-start-color: var(--type-fighting); }
+.draft-option--poison { border-inline-start-color: var(--type-poison); }
+.draft-option--ground { border-inline-start-color: var(--type-ground); }
+.draft-option--flying { border-inline-start-color: var(--type-flying); }
+.draft-option--psychic { border-inline-start-color: var(--type-psychic); }
+.draft-option--bug { border-inline-start-color: var(--type-bug); }
+.draft-option--rock { border-inline-start-color: var(--type-rock); }
+.draft-option--ghost { border-inline-start-color: var(--type-ghost); }
+.draft-option--dragon { border-inline-start-color: var(--type-dragon); }
+.draft-option--dark { border-inline-start-color: var(--type-dark); }
+.draft-option--steel { border-inline-start-color: var(--type-steel); }
+.draft-option--fairy { border-inline-start-color: var(--type-fairy); }
 
 /* ---------- Utilities --------------------------------------------------- */
 

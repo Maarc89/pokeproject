@@ -1,0 +1,40 @@
+{% comment %}
+Both sides of a played battle, with live HP.
+
+Expects `game` (a BattleGame) and `state` (a services.interactive.GameState),
+plus the usual optional `shiny`.
+
+The HP bar reuses .hp-bar from the battle log rather than inventing a second
+one, so a bar means the same thing everywhere in the app.
+{% endcomment %}
+<section class="arena" aria-label="Battle field">
+    <div class="arena__side arena__side--player{% if not game.player_hp %} is-fainted{% endif %}">
+        <p class="arena__role">You</p>
+        {% include "partials/_sprite.html" with sprite=state.player.sprite sprite_shiny=state.player.sprite_shiny name=state.player.name size=120 %}
+        <h2 class="arena__name">{{ state.player.name }}</h2>
+        {% include "partials/_types.html" with types=state.player.types %}
+
+        <p class="arena__hp">{{ game.player_hp }} / {{ game.player_max_hp }} HP</p>
+        <span class="hp-bar" role="img"
+              aria-label="{{ state.player.name }} on {{ game.player_hp_pct }} percent health">
+            <span class="hp-bar__fill hp-bar__fill--{% if game.player_hp_pct > 50 %}high{% elif game.player_hp_pct > 20 %}mid{% else %}low{% endif %}"
+                  style="width: {{ game.player_hp_pct }}%"></span>
+        </span>
+    </div>
+
+    <p class="arena__versus" aria-hidden="true">vs</p>
+
+    <div class="arena__side arena__side--opponent{% if not game.opponent_hp %} is-fainted{% endif %}">
+        <p class="arena__role">Opponent</p>
+        {% include "partials/_sprite.html" with sprite=state.opponent.sprite sprite_shiny=state.opponent.sprite_shiny name=state.opponent.name size=120 %}
+        <h2 class="arena__name">{{ state.opponent.name }}</h2>
+        {% include "partials/_types.html" with types=state.opponent.types %}
+
+        <p class="arena__hp">{{ game.opponent_hp }} / {{ game.opponent_max_hp }} HP</p>
+        <span class="hp-bar" role="img"
+              aria-label="{{ state.opponent.name }} on {{ game.opponent_hp_pct }} percent health">
+            <span class="hp-bar__fill hp-bar__fill--{% if game.opponent_hp_pct > 50 %}high{% elif game.opponent_hp_pct > 20 %}mid{% else %}low{% endif %}"
+                  style="width: {{ game.opponent_hp_pct }}%"></span>
+        </span>
+    </div>
+</section>

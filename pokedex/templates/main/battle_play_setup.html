@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Play a Battle{% endblock %}
+
+{% block content %}
+    <h1>Play a Battle</h1>
+    <p class="lede">
+        The same level-50 fight as the simulator, except <em>you</em> pick the
+        move each turn. Damage rolls, moves miss, and a lucky critical hit can
+        turn a losing matchup &mdash; so read the type chart and choose well.
+    </p>
+
+    <form method="post" action="{% url 'play_draft' %}" class="card battle-form" data-loading>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <p class="field__error">{{ form.non_field_errors.0 }}</p>
+        {% endif %}
+
+        <div class="battle-form__inputs">
+            <div class="field">
+                <label for="{{ form.pokemon1.id_for_label }}">Your Pokemon</label>
+                {{ form.pokemon1 }}
+                {% if form.pokemon1.errors %}<p class="field__error">{{ form.pokemon1.errors.0 }}</p>{% endif %}
+            </div>
+
+            <p class="battle-form__versus" aria-hidden="true">vs</p>
+
+            <div class="field">
+                <label for="{{ form.pokemon2.id_for_label }}">Opponent</label>
+                {{ form.pokemon2 }}
+                {% if form.pokemon2.errors %}<p class="field__error">{{ form.pokemon2.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn--primary" data-loading-text="Setting up...">Choose moves</button>
+        <p class="hint">
+            Looking up move data takes a moment the first time a Pokemon is used.
+            After that the whole battle runs from local data.
+        </p>
+    </form>
+
+    {% if quick_picks %}
+        {% comment %}
+        Same two-click set-up as the simulator's form: whichever slot is still
+        empty gets filled, and {% templatetag openblock %} querystring {% templatetag closeblock %}
+        carries the other one.
+        {% endcomment %}
+        <section class="card">
+            <h2>From your Pokedex</h2>
+            <p class="hint">
+                {% if form.pokemon1.value %}
+                    Pick an opponent for {{ form.pokemon1.value|title }}.
+                {% else %}
+                    Pick the Pokemon you want to play as.
+                {% endif %}
+            </p>
+            <ul class="quick-picks">
+                {% for pick in quick_picks %}
+                    <li>
+                        <a class="btn btn--ghost"
+                           href="{% if form.pokemon1.value %}{% querystring second=pick.slug %}{% else %}{% querystring first=pick.slug %}{% endif %}">{{ pick.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    <div class="actions">
+        <a href="{% url 'play_history' %}" class="btn btn--ghost">Past games</a>
+        <a href="{% url 'battle' %}" class="btn btn--ghost">Simulate instead</a>
+    </div>
+{% endblock %}
